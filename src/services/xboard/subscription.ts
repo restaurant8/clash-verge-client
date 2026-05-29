@@ -28,6 +28,28 @@ const subscribeExtra = (subscribeInfo?: XboardRecord) => ({
   expire: numberValue(subscribeInfo?.expired_at),
 })
 
+const buildProfileOption = (
+  remoteConfig: XboardRemoteConfig,
+  base?: IProfileOption,
+): IProfileOption => ({
+  ...base,
+  with_proxy: true,
+  self_proxy: false,
+  user_agent: `${remoteConfig.custom_ua} clashmeta`,
+  allow_auto_update: false,
+})
+
+const findXboardProfile = (
+  items: IProfileItem[],
+  profileName: string,
+  subscribeUrl: string,
+  preferredUid?: string,
+) =>
+  items.find((item) => item.uid === preferredUid) ??
+  items.find((item) => item.url === subscribeUrl) ??
+  items.find((item) => item.uid === XBOARD_PROFILE_UID) ??
+  items.find((item) => item.name === profileName)
+
 export const ensureXboardSubscriptionProfile = async (
   client: XboardApiClient,
   subscribeToken: string,
@@ -42,42 +64,76 @@ export const ensureXboardSubscriptionProfile = async (
 
   yaml.load(yamlText)
 
+  const profileName = `${remoteConfig.APP_NAME} 订阅`
+  const subscribeUrl = client.webSubscribeUrl(
+    remoteConfig.subscribe_path,
+    subscribeToken,
+  )
   const profiles = await getProfiles()
   const items = profiles.items ?? []
-  const existing = items.find(
-    (item) =>
-      item.uid === XBOARD_PROFILE_UID ||
-      item.name === `${remoteConfig.APP_NAME} 订阅`,
-  )
-  const uid = existing?.uid ?? XBOARD_PROFILE_UID
-  const itemPatch: Partial<IProfileItem> = {
+  const existing = findXboardProfile(items, profileName, subscribeUrl)
+
+  const buildPatch = (
+    uid: string,
+    baseOption?: IProfileOption,
+  ): Partial<IProfileItem> => ({
     uid,
     type: 'local',
-    name: `${remoteConfig.APP_NAME} 订阅`,
+    name: profileName,
     desc: '由云端订阅服务生成，连接前会重新校验套餐和节点。',
-    url: client.webSubscribeUrl(remoteConfig.subscribe_path, subscribeToken),
+    url: subscribeUrl,
     extra: subscribeExtra(subscribeInfo),
-    option: {
-      with_proxy: true,
-      self_proxy: false,
-      user_agent: `${remoteConfig.custom_ua} clashmeta`,
-      allow_auto_update: false,
-    },
+    option: buildProfileOption(remoteConfig, baseOption),
+  })
+
+  let uid = existing?.uid
+
+  if (existing && uid) {
+    await saveProfileFile(uid, yamlText)
+    await patchProfile(uid, buildPatch(uid, existing.option))
+  } else {
+    const createdUid = await createProfile(
+      {
+        type: 'local',
+        name: profileName,
+        desc: '由云端订阅服务生成，连接前会重新校验套餐和节点。',
+        option: buildProfileOption(remoteConfig),
+      },
+      yamlText,
+    )
+    const createdProfiles = await getProfiles()
+    const created = findXboardProfile(
+      createdProfiles.items ?? [],
+      profileName,
+      subscribeUrl,
+      createdUid,
+    )
+
+    if (!created?.uid) {
+      throw new Error('订阅配置已创建，但未找到对应 profile')
+    }
+
+    uid = created.uid
+    await patchProfile(uid, buildPatch(uid, created.option))
   }
 
-  if (existing) {
-    await saveProfileFile(uid, yamlText)
-    await patchProfile(uid, itemPatch)
-  } else {
-    await createProfile(itemPatch, yamlText)
+  if (!uid) {
+    throw new Error('订阅配置 uid 为空')
   }
 
   const nextProfiles = await getProfiles()
-  await patchProfilesConfig({
+  const switched = await patchProfilesConfig({
     ...nextProfiles,
     current: uid,
   })
-  await enhanceProfiles()
+  if (!switched) {
+    throw new Error('订阅配置校验失败，未能切换到 Xboard profile')
+  }
+
+  const enhanced = await enhanceProfiles()
+  if (!enhanced) {
+    throw new Error('订阅配置生成失败')
+  }
 
   return uid
 }

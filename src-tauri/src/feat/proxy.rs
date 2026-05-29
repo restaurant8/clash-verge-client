@@ -70,14 +70,16 @@ pub async fn toggle_tun_mode(not_save_file: Option<bool>) -> bool {
 
 /// Copy proxy environment variables to clipboard
 pub async fn copy_clash_env() {
-    let env_ip = env::var("CLASH_VERGE_REV_IP").ok();
+    let env_ip = env::var("MUACLOUD_PROXY_IP").ok();
     let verge_cfg = Config::verge().await.latest_arc();
     let ip = env_ip
         .as_deref()
         .unwrap_or_else(|| verge_cfg.proxy_host.as_deref().unwrap_or("127.0.0.1"));
 
     let app_handle = handle::Handle::app_handle();
-    let port = verge_cfg.verge_mixed_port.unwrap_or(7897);
+    let port = verge_cfg
+        .verge_mixed_port
+        .unwrap_or(crate::constants::network::ports::DEFAULT_MIXED);
     let http_proxy = format!("http://{ip}:{port}");
     let socks5_proxy = format!("socks5://{ip}:{port}");
 

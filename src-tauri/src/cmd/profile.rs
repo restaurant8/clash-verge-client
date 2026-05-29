@@ -124,16 +124,14 @@ pub async fn reorder_profile(active_id: String, over_id: String) -> CmdResult {
 /// 创建新的profile
 /// 创建一个新的配置文件
 #[tauri::command]
-pub async fn create_profile(item: PrfItem, file_data: Option<String>) -> CmdResult {
+pub async fn create_profile(item: PrfItem, file_data: Option<String>) -> CmdResult<std::string::String> {
     match profiles_append_item_with_filedata_safe(&item, file_data).await {
-        Ok(_) => {
+        Ok(uid) => {
             profiles_save_file_safe().await.stringify_err()?;
-            // 发送配置变更通知
-            if let Some(uid) = &item.uid {
-                logging!(info, Type::Cmd, "[创建订阅] 发送配置变更通知: {}", uid);
-                handle::Handle::notify_profile_changed(uid);
-            }
-            Ok(())
+            logging!(info, Type::Cmd, "[创建订阅] 发送配置变更通知: {}", uid);
+            let notify_uid: String = uid.clone().into();
+            handle::Handle::notify_profile_changed(&notify_uid);
+            Ok(uid)
         }
         Err(err) => match err.to_string().as_str() {
             "the file already exists" => Err("the file already exists".into()),

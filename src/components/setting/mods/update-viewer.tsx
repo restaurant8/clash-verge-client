@@ -228,9 +228,7 @@ export function UpdateViewer({ ref }: { ref?: Ref<DialogRef> }) {
             size="small"
             sx={{ whiteSpace: 'nowrap' }}
             onClick={() => {
-              openUrl(
-                `https://github.com/clash-verge-rev/clash-verge-rev/releases/tag/v${updateInfo?.version}`,
-              )
+              openUrl('https://muacloud.vip')
             }}
           >
             {t('settings.modals.update.actions.goToRelease')}

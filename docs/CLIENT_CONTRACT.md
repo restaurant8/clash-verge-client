@@ -402,10 +402,16 @@ GET /api/v1/client/subscribe?token={subscribe_token}&flag=clashmeta
 
 - `windows_version`
 - `windows_download_url`
+- `windows_update_notes`
+- `windows_force_update`
 - `macos_version`
 - `macos_download_url`
+- `macos_update_notes`
+- `macos_force_update`
 - `android_version`
 - `android_download_url`
+- `android_update_notes`
+- `android_force_update`
 
 客户端必须按当前平台读取对应字段。
 
@@ -771,10 +777,23 @@ invite_domain=
 crisp_id=4010755c-2d1e-42a1-8380-8f4c20fe01c4
 imgbb_api_key=
 discount_delay_seconds=0
+delay_display_scale=0.5
 version=1.0.0
 update_notes=
 force_update=false
 latest_client_url=
+windows_version=
+windows_download_url=
+windows_update_notes=
+windows_force_update=
+macos_version=
+macos_download_url=
+macos_update_notes=
+macos_force_update=
+android_version=
+android_download_url=
+android_update_notes=
+android_force_update=
 ```
 
 字段说明：
@@ -796,10 +815,23 @@ latest_client_url=
 | `crisp_id` | string | Crisp 客服 ID，远程值覆盖客户端内置默认值 |
 | `imgbb_api_key` | string | 图片上传服务 key；如暴露风险较高，生产建议改为服务端代理 |
 | `discount_delay_seconds` | integer | 优惠/弹窗延迟展示秒数 |
+| `delay_display_scale` | decimal-string | 节点延迟展示倍率，只影响 UI 展示，不改变真实测速、排序、超时判断；客户端默认 `0.5`，建议范围 `0.1`-`1` |
 | `version` | string | 远程配置版本或客户端最新版本 |
 | `update_notes` | string | 更新说明 |
 | `force_update` | boolean-string | 是否强制更新，`true/false` |
 | `latest_client_url` | url/string | 最新客户端下载地址 |
+| `windows_version` | string | Windows 客户端最新版本；为空时回退到 `version` |
+| `windows_download_url` | url/string | Windows 客户端下载地址；为空时回退到 `latest_client_url` |
+| `windows_update_notes` | string | Windows 更新说明；为空时回退到 `update_notes` |
+| `windows_force_update` | boolean-string | Windows 是否强制更新；为空时回退到 `force_update` |
+| `macos_version` | string | macOS 客户端最新版本；为空时回退到 `version` |
+| `macos_download_url` | url/string | macOS 客户端下载地址；为空时回退到 `latest_client_url` |
+| `macos_update_notes` | string | macOS 更新说明；为空时回退到 `update_notes` |
+| `macos_force_update` | boolean-string | macOS 是否强制更新；为空时回退到 `force_update` |
+| `android_version` | string | Android 客户端最新版本；为空时回退到 `version` |
+| `android_download_url` | url/string | Android 客户端下载地址；为空时回退到 `latest_client_url` |
+| `android_update_notes` | string | Android 更新说明；为空时回退到 `update_notes` |
+| `android_force_update` | boolean-string | Android 是否强制更新；为空时回退到 `force_update` |
 
 推荐在 `/api/v1/app/bootstrap` 中增加一个兼容块，保持现有结构不变：
 
@@ -825,10 +857,23 @@ latest_client_url=
       "crisp_id": "4010755c-2d1e-42a1-8380-8f4c20fe01c4",
       "imgbb_api_key": "",
       "discount_delay_seconds": 0,
+      "delay_display_scale": 0.5,
       "version": "1.0.0",
       "update_notes": "",
       "force_update": false,
-      "latest_client_url": ""
+      "latest_client_url": "",
+      "windows_version": "",
+      "windows_download_url": "",
+      "windows_update_notes": "",
+      "windows_force_update": false,
+      "macos_version": "",
+      "macos_download_url": "",
+      "macos_update_notes": "",
+      "macos_force_update": false,
+      "android_version": "",
+      "android_download_url": "",
+      "android_update_notes": "",
+      "android_force_update": false
     }
   }
 }
@@ -842,6 +887,8 @@ latest_client_url=
 - `subscribe_path=link` 时，Web 兼容订阅地址为 `{active_api_domain}/link/{subscribe_token}`。
 - `APP_URL` 为空时，客户端可使用当前选中的 `active_api_domain` 作为打开官网/登录跳转的基础域名。
 - `force_update=true` 时，必须优先展示强更页面；`latest_client_url` 为空时使用 `download_urls` 当前平台地址兜底。
+- 平台字段优先级高于通用字段。例如 Windows 端优先读取 `windows_version`、`windows_download_url`、`windows_update_notes`、`windows_force_update`，为空时再回退到 `version`、`latest_client_url`、`update_notes`、`force_update`。
+- `delay_display_scale` 只用于压缩节点延迟展示值，客户端必须限制在 `0.1`-`1` 之间；超时、错误和真实测速结果不得被该字段改写。
 - `oss_url` 可作为图片、公告、安装包、远程配置镜像的兜底源，不参与用户 API 请求。
 - `imgbb_api_key` 属于公开配置风险字段。若用于用户上传截图，建议后续改为后端上传代理，避免 key 被客户端逆向提取。
 
@@ -928,6 +975,7 @@ custom_ua=muacloud/1.0
 api_domains=https://5.muacloud.xyz;https://5.12o.ooo;https://muacloud.vip;https://5.muacloud.vip
 backup_api_domains=
 subscribe_path=link
+delay_display_scale=0.5
 version=1.0.0
 force_update=false
 ```

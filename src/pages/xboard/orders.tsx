@@ -42,9 +42,25 @@ import {
 
 import { sleep } from './utils'
 
+const getOrderStatus = (order: any) =>
+  String(order.status ?? order.order_status ?? '').toLowerCase()
+
+const isPendingOrderStatus = (status: string) =>
+  status === '0' || status === '' || status === 'pending' || status === 'unpaid'
+
+const isPaidOrderStatus = (status: string) =>
+  status === '3' ||
+  status === 'paid' ||
+  status === 'success' ||
+  status === 'completed'
+
 const isPayableOrder = (order: any) => {
-  const status = String(order.status ?? order.order_status ?? '')
-  return status === '0' || status === ''
+  return isPendingOrderStatus(getOrderStatus(order))
+}
+
+const isVisibleOrder = (order: any) => {
+  const status = getOrderStatus(order)
+  return isPendingOrderStatus(status) || isPaidOrderStatus(status)
 }
 
 const OrdersPage = () => {
@@ -70,7 +86,8 @@ const OrdersPage = () => {
     void Promise.all([loadOrders(), loadPlans()])
   }, [loadOrders, loadPlans])
 
-  const orders = resourceCache.orders ?? []
+  const allOrders = resourceCache.orders ?? []
+  const orders = useMemo(() => allOrders.filter(isVisibleOrder), [allOrders])
   const payments = useMemo(
     () => getUsablePayments(resourceCache.payments ?? []),
     [resourceCache.payments],
@@ -351,7 +368,14 @@ const OrdersPage = () => {
             })}
           </Grid>
         ) : (
-          <XboardEmpty title="暂无订单" description="当前账户暂无订单记录。" />
+          <XboardEmpty
+            title="暂无订单"
+            description={
+              allOrders.length
+                ? '当前没有待支付或支付成功的订单。'
+                : '当前账户暂无订单记录。'
+            }
+          />
         )}
       </Stack>
     </XboardPage>

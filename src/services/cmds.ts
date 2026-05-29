@@ -31,7 +31,7 @@ export async function createProfile(
   item: Partial<IProfileItem>,
   fileData?: string | null,
 ) {
-  return invoke<void>('create_profile', { item, fileData })
+  return invoke<string>('create_profile', { item, fileData })
 }
 
 export async function viewProfile(index: string) {

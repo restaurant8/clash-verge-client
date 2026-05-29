@@ -263,7 +263,7 @@ const HomePage = () => {
 
   // 文档链接函数
   const toGithubDoc = useLockFn(() => {
-    return openWebUrl('https://clash-verge-rev.github.io/index.html')
+    return openWebUrl('https://muacloud.vip')
   })
 
   // 新增：打开设置弹窗

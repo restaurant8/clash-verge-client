@@ -1,11 +1,9 @@
 import {
   CloseRounded,
-  CloudOffRounded,
+  DnsOutlined,
   EmailRounded,
   LoginRounded,
-  RefreshRounded,
-  RocketLaunchRounded,
-  ShoppingCartRounded,
+  RouterOutlined,
 } from '@mui/icons-material'
 import {
   Alert,
@@ -31,7 +29,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import brandLogo from '@/assets/image/muacloud-mascot-logo.png'
-import ProxyControlSwitches from '@/components/shared/proxy-control-switches'
+import { ClashModeCard } from '@/components/home/clash-mode-card'
+import { EnhancedCard } from '@/components/home/enhanced-card'
+import { ProxyTunCard } from '@/components/home/proxy-tun-card'
 import { XboardPage } from '@/components/xboard/xboard-page'
 import {
   XboardActionButton,
@@ -40,7 +40,6 @@ import {
   XboardStatusChip,
   XboardTrafficBar,
 } from '@/components/xboard/xboard-primitives'
-import { useAppRefreshers } from '@/providers/app-data-context'
 import { useXboard } from '@/providers/xboard-context'
 import { formatBytes, formatDateTime } from '@/services/xboard/format'
 import {
@@ -1265,62 +1264,18 @@ const AuthPanel = () => {
 
 const ConnectPage = () => {
   const navigate = useNavigate()
-  const { refreshProxy } = useAppRefreshers()
   const {
     session,
     userInfo,
     subscribeInfo,
     servers,
     booting,
-    refreshing,
     connection,
-    connect,
-    disconnect,
-    refreshAccount,
   } = useXboard()
-  const [connectBusy, setConnectBusy] = useState(false)
-  const [disconnectBusy, setDisconnectBusy] = useState(false)
 
   const used = Number(subscribeInfo?.u ?? 0) + Number(subscribeInfo?.d ?? 0)
   const total = Number(subscribeInfo?.transfer_enable ?? 0)
   const hasServers = servers.length > 0
-  const percent = total > 0 ? Math.min((used / total) * 100, 100) : 0
-
-  const status = useMemo(() => {
-    if (!session) return { label: '未登录', color: 'default' as const }
-    if (!hasServers) return { label: '无可用节点', color: 'warning' as const }
-    if (connection.status === 'connected') {
-      return { label: '已连接', color: 'success' as const }
-    }
-    if (connection.status === 'connecting') {
-      return { label: '连接中', color: 'info' as const }
-    }
-    if (connection.status === 'error') {
-      return { label: '连接失败', color: 'error' as const }
-    }
-    return { label: '待连接', color: 'default' as const }
-  }, [connection.status, hasServers, session])
-  const connectionBusy =
-    connectBusy || refreshing || connection.status === 'connecting'
-
-  const handleConnect = useLockFn(async () => {
-    setConnectBusy(true)
-    try {
-      await connect()
-      await refreshProxy()
-    } finally {
-      setConnectBusy(false)
-    }
-  })
-
-  const handleDisconnect = useLockFn(async () => {
-    setDisconnectBusy(true)
-    try {
-      await disconnect()
-    } finally {
-      setDisconnectBusy(false)
-    }
-  })
 
   if (booting) {
     return (
@@ -1351,175 +1306,100 @@ const ConnectPage = () => {
 
   return (
     <XboardPage
-      title="智能连接"
-      subtitle="自动选择可用线路，连接前会校验账户权益。"
-      action={
-        <Button
-          variant="outlined"
-          startIcon={
-            refreshing ? (
-              <CircularProgress color="inherit" size={16} />
-            ) : (
-              <RefreshRounded />
-            )
-          }
-          disabled={refreshing}
-          onClick={() => void refreshAccount()}
-        >
-          刷新
-        </Button>
-      }
+      title="系统-网卡双代理"
+      subtitle="真全局"
     >
-      <Grid container spacing={1.75}>
-        <Grid size={{ xs: 12, md: 4 }}>
-          <XboardPanel
-            title="连接控制"
+      <Stack spacing={2}>
+        {connection.status === 'error' && connection.message && (
+          <Alert severity="error">{connection.message}</Alert>
+        )}
+        {!hasServers && (
+          <Alert
+            severity="warning"
             action={
-              <XboardStatusChip status={status.color} label={status.label} />
-            }
-          >
-            <Stack spacing={2}>
-              <Box
-                sx={{
-                  width: 168,
-                  height: 168,
-                  mx: 'auto',
-                  borderRadius: '50%',
-                  background:
-                    connection.status === 'connected'
-                      ? `conic-gradient(#16a36f 0 ${Math.max(percent, 8)}%, #e7eee9 ${Math.max(percent, 8)}% 100%)`
-                      : 'conic-gradient(#d9e2de 0 100%, #d9e2de 0 100%)',
-                  display: 'grid',
-                  placeItems: 'center',
-                }}
-              >
-                <Box
-                  sx={{
-                    width: 126,
-                    height: 126,
-                    borderRadius: '50%',
-                    bgcolor: '#fff',
-                    border: '1px solid',
-                    borderColor: '#e6eee9',
-                    display: 'grid',
-                    placeItems: 'center',
-                    textAlign: 'center',
-                  }}
-                >
-                  <Box>
-                    <Typography variant="caption" color="text.secondary">
-                      状态
-                    </Typography>
-                    <Typography sx={{ fontSize: 20, fontWeight: 900 }}>
-                      {status.label}
-                    </Typography>
-                  </Box>
-                </Box>
-              </Box>
-
-              {connection.status === 'error' && connection.message && (
-                <Alert severity="error">{connection.message}</Alert>
-              )}
-              {!hasServers && (
-                <Alert severity="warning">
-                  当前账户暂无可用节点，请开通或续费套餐。
-                </Alert>
-              )}
-
-              {connection.status === 'connected' ? (
-                <XboardActionButton
-                  color="error"
-                  size="large"
-                  startIcon={
-                    disconnectBusy ? (
-                      <CircularProgress color="inherit" size={18} />
-                    ) : (
-                      <CloudOffRounded />
-                    )
-                  }
-                  disabled={disconnectBusy}
-                  onClick={() => void handleDisconnect()}
-                >
-                  断开连接
-                </XboardActionButton>
-              ) : (
-                <XboardActionButton
-                  size="large"
-                  startIcon={
-                    connectionBusy ? (
-                      <CircularProgress color="inherit" size={18} />
-                    ) : (
-                      <RocketLaunchRounded />
-                    )
-                  }
-                  disabled={!hasServers || connectionBusy}
-                  onClick={() => void handleConnect()}
-                >
-                  连接
-                </XboardActionButton>
-              )}
               <Button
-                variant="outlined"
-                size="large"
-                startIcon={<ShoppingCartRounded />}
+                color="inherit"
+                size="small"
                 onClick={() => navigate('/plans')}
               >
-                购买 / 续费
+                套餐
               </Button>
-            </Stack>
-          </XboardPanel>
+            }
+          >
+            当前账户暂无可用节点，连接前需要开通或续费套餐。
+          </Alert>
+        )}
+
+        <Grid container spacing={1.5}>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <EnhancedCard
+              title="网络设置"
+              icon={<DnsOutlined />}
+              iconColor="primary"
+            >
+              <ProxyTunCard />
+            </EnhancedCard>
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <EnhancedCard
+              title="代理模式"
+              icon={<RouterOutlined />}
+              iconColor="info"
+            >
+              <ClashModeCard showCurrentNodeSelector />
+            </EnhancedCard>
+          </Grid>
         </Grid>
 
-        <Grid size={{ xs: 12, md: 8 }}>
-          <Stack spacing={1.75}>
-            <Grid container spacing={1.25}>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <XboardMetric label="已用流量" value={formatBytes(used)} />
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <XboardMetric label="总流量" value={formatBytes(total)} />
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <XboardMetric
-                  label="到期时间"
-                  value={formatDateTime(subscribeInfo?.expired_at)}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <XboardMetric label="可用节点" value={servers.length} />
-              </Grid>
-            </Grid>
+        <Grid container spacing={1.5}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <XboardMetric label="已用流量" value={formatBytes(used)} />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <XboardMetric label="总流量" value={formatBytes(total)} />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <XboardMetric
+              label="到期时间"
+              value={formatDateTime(subscribeInfo?.expired_at)}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <XboardMetric label="可用节点" value={servers.length} />
+          </Grid>
+        </Grid>
 
-            <XboardPanel title="账户摘要">
-              <Stack spacing={1.25}>
-                <Stack
-                  direction={{ xs: 'column', sm: 'row' }}
-                  spacing={1}
-                  sx={{ justifyContent: 'space-between' }}
-                >
-                  <Box>
-                    <Typography sx={{ fontWeight: 900 }}>
-                      {userInfo?.email ?? session.email ?? '已登录账户'}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {subscribeInfo?.plan?.name ?? '未开通套餐'}
-                    </Typography>
-                  </Box>
-                  <XboardStatusChip
-                    status={subscribeInfo?.expired_at ? 'success' : 'warning'}
-                    label={subscribeInfo?.expired_at ? '权益有效' : '待开通'}
-                  />
-                </Stack>
-                <XboardTrafficBar used={used} total={total} />
-              </Stack>
-            </XboardPanel>
-
-            <XboardPanel title="TUN 代理">
-              <ProxyControlSwitches mode="tun" noRightPadding />
-            </XboardPanel>
+        <XboardPanel
+          title="账户摘要"
+          action={
+            <XboardStatusChip
+              status={subscribeInfo?.expired_at ? 'success' : 'warning'}
+              label={subscribeInfo?.expired_at ? '权益有效' : '待开通'}
+            />
+          }
+          sx={{ p: 2.25 }}
+        >
+          <Stack spacing={1.5}>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography
+                sx={{
+                  maxWidth: '100%',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  fontWeight: 900,
+                }}
+              >
+                {userInfo?.email ?? session.email ?? '已登录账户'}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {subscribeInfo?.plan?.name ?? '未开通套餐'}
+              </Typography>
+            </Box>
+            <XboardTrafficBar used={used} total={total} />
           </Stack>
-        </Grid>
-      </Grid>
+        </XboardPanel>
+      </Stack>
     </XboardPage>
   )
 }

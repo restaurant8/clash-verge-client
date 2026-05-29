@@ -114,7 +114,7 @@ async fn get_config_values() -> ConfigValues {
         enable_builtin_enhanced.unwrap_or(true),
         verge_socks_enabled.unwrap_or(false),
         verge_http_enabled.unwrap_or(false),
-        enable_dns_settings.unwrap_or(false),
+        enable_dns_settings.unwrap_or(true),
     );
 
     #[cfg(not(target_os = "windows"))]

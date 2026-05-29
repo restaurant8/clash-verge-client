@@ -13,7 +13,7 @@
     ],
     "resources": ["resources"],
     "publisher": "MuaCloud",
-    "externalBin": ["sidecar/verge-mihomo", "sidecar/verge-mihomo-alpha"],
+    "externalBin": ["sidecar/muacloud-mihomo", "sidecar/muacloud-mihomo-alpha"],
     "copyright": "GNU General Public License v3.0",
     "category": "DeveloperTool",
     "shortDescription": "MuaCloud Native Control Client",
@@ -22,8 +22,8 @@
   "build": {
     "beforeBuildCommand": "pnpm run web:build",
     "frontendDist": "../dist",
-    "beforeDevCommand": "node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 3000",
-    "devUrl": "http://127.0.0.1:3000/",
+    "beforeDevCommand": "node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 3100 --strictPort",
+    "devUrl": "http://127.0.0.1:3100/",
     "removeUnusedCommands": true
   },
   "productName": "MuaCloud",
@@ -32,9 +32,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQyOEMyRjBCQkVGOUJEREYKUldUZnZmbStDeStNMHU5Mmo1N24xQXZwSVRYbXA2NUpzZE5oVzlqeS9Bc0t6RVV4MmtwVjBZaHgK",
       "endpoints": [
-        "https://update.hwdns.net/https://github.com/clash-verge-rev/clash-verge-rev/releases/download/updater/update-proxy.json",
-        "https://gh-proxy.org/https://github.com/clash-verge-rev/clash-verge-rev/releases/download/updater/update-proxy.json",
-        "https://github.com/clash-verge-rev/clash-verge-rev/releases/download/updater/update.json"
+        "https://a.4iox.com/update.json"
       ],
       "windows": {
         "installMode": "passive"
@@ -42,7 +40,7 @@
     },
     "deep-link": {
       "desktop": {
-        "schemes": ["clash", "clash-verge"]
+        "schemes": ["muacloud", "muacloud-client"]
       }
     }
   },

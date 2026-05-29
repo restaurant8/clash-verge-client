@@ -41,7 +41,7 @@ fn uninstall_service() -> Result<()> {
     use std::os::windows::process::CommandExt as _;
 
     let binary_path = dirs::service_path()?;
-    let uninstall_path = binary_path.with_file_name("clash-verge-service-uninstall.exe");
+    let uninstall_path = binary_path.with_file_name("muacloud-service-uninstall.exe");
 
     if !uninstall_path.exists() {
         bail!(format!("uninstaller not found: {uninstall_path:?}"));
@@ -74,7 +74,7 @@ fn install_service() -> Result<()> {
     use std::os::windows::process::CommandExt as _;
 
     let binary_path = dirs::service_path()?;
-    let install_path = binary_path.with_file_name("clash-verge-service-install.exe");
+    let install_path = binary_path.with_file_name("muacloud-service-install.exe");
 
     if !install_path.exists() {
         bail!(format!("installer not found: {install_path:?}"));
@@ -115,7 +115,7 @@ fn install_service() -> Result<()> {
 fn uninstall_service() -> Result<()> {
     logging!(info, Type::Service, "uninstall service");
 
-    let uninstall_path = tauri::utils::platform::current_exe()?.with_file_name("clash-verge-service-uninstall");
+    let uninstall_path = tauri::utils::platform::current_exe()?.with_file_name("muacloud-service-uninstall");
 
     if !uninstall_path.exists() {
         bail!(format!("uninstaller not found: {uninstall_path:?}"));
@@ -171,7 +171,7 @@ fn uninstall_service() -> Result<()> {
 fn install_service() -> Result<()> {
     logging!(info, Type::Service, "install service");
 
-    let install_path = tauri::utils::platform::current_exe()?.with_file_name("clash-verge-service-install");
+    let install_path = tauri::utils::platform::current_exe()?.with_file_name("muacloud-service-install");
 
     if !install_path.exists() {
         bail!(format!("installer not found: {install_path:?}"));
@@ -234,7 +234,7 @@ fn uninstall_service() -> Result<()> {
     logging!(info, Type::Service, "uninstall service");
 
     let binary_path = dirs::service_path()?;
-    let uninstall_path = binary_path.with_file_name("clash-verge-service-uninstall");
+    let uninstall_path = binary_path.with_file_name("muacloud-service-uninstall");
 
     if !uninstall_path.exists() {
         bail!(format!("uninstaller not found: {uninstall_path:?}"));
@@ -267,7 +267,7 @@ fn install_service() -> Result<()> {
     logging!(info, Type::Service, "install service");
 
     let binary_path = dirs::service_path()?;
-    let install_path = binary_path.with_file_name("clash-verge-service-install");
+    let install_path = binary_path.with_file_name("muacloud-service-install");
 
     if !install_path.exists() {
         bail!(format!("installer not found: {install_path:?}"));
@@ -280,7 +280,7 @@ fn install_service() -> Result<()> {
     let gid = tauri_plugin_clash_verge_sysinfo::current_gid();
     let prompt = clash_verge_i18n::t!("service.adminInstallPrompt");
     let command = format!(
-        r#"do shell script "sudo CLASH_VERGE_SERVICE_GID={gid} '{install_shell}'" with administrator privileges with prompt "{prompt}""#
+        r#"do shell script "sudo MUACLOUD_SERVICE_GID={gid} '{install_shell}'" with administrator privileges with prompt "{prompt}""#
     );
 
     let output = StdCommand::new("osascript").args(vec!["-e", &command]).output()?;
@@ -363,7 +363,7 @@ pub(super) async fn start_with_existing_service(config_file: &PathBuf) -> Result
 
     let response = clash_verge_service_ipc::start_clash(&payload)
         .await
-        .context("无法连接到Clash Verge Service")?;
+        .context("无法连接到MuaCloud Service")?;
 
     if response.code > 0 {
         let err_msg = response.message;
@@ -390,7 +390,7 @@ pub(super) async fn get_clash_logs_by_service() -> Result<Vec<CompactString>> {
 
     let response = clash_verge_service_ipc::get_clash_logs()
         .await
-        .context("无法连接到Clash Verge Service")?;
+        .context("无法连接到MuaCloud Service")?;
 
     if response.code > 0 {
         let err_msg = response.message;
@@ -408,7 +408,7 @@ pub(super) async fn stop_core_by_service() -> Result<()> {
 
     let response = clash_verge_service_ipc::stop_clash()
         .await
-        .context("无法连接到Clash Verge Service")?;
+        .context("无法连接到MuaCloud Service")?;
 
     if response.code > 0 {
         let err_msg = response.message;

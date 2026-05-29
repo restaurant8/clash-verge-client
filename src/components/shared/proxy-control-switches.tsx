@@ -98,9 +98,11 @@ const SwitchRow = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        gap: 1,
+        minWidth: 0,
         p: 1,
         pr: 2,
-        borderRadius: 1.5,
+        borderRadius: 1,
         bgcolor: highlight
           ? alpha(theme.palette.success.main, 0.07)
           : 'transparent',
@@ -108,15 +110,26 @@ const SwitchRow = ({
         transition: 'background-color 0.3s',
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
         {active ? (
-          <PlayCircleOutlineRounded sx={{ color: 'success.main', mr: 1 }} />
+          <PlayCircleOutlineRounded
+            sx={{ flex: '0 0 auto', color: 'success.main', mr: 1 }}
+          />
         ) : (
-          <PauseCircleOutlineRounded sx={{ color: 'text.disabled', mr: 1 }} />
+          <PauseCircleOutlineRounded
+            sx={{ flex: '0 0 auto', color: 'text.disabled', mr: 1 }}
+          />
         )}
         <Typography
           variant="subtitle1"
-          sx={{ fontWeight: 500, fontSize: '15px' }}
+          sx={{
+            minWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            fontWeight: 600,
+            fontSize: '14px',
+          }}
         >
           {label}
         </Typography>
@@ -134,6 +147,7 @@ const SwitchRow = ({
         disabled={disabled || pending}
         checked={checked}
         onChange={handleChange}
+        sx={{ flex: '0 0 auto' }}
       />
     </Box>
   )
@@ -206,7 +220,9 @@ const ProxyControlSwitches = ({
     <Box sx={{ width: '100%', pr: noRightPadding ? 1 : 2 }}>
       {isSystemProxyMode && (
         <SwitchRow
-          label={t('settings.sections.proxyControl.fields.systemProxy')}
+          label={
+            label ?? t('settings.sections.proxyControl.fields.systemProxy')
+          }
           active={systemProxyIndicator}
           infoTitle={t('settings.sections.proxyControl.tooltips.systemProxy')}
           onInfoClick={() =>
@@ -222,7 +238,7 @@ const ProxyControlSwitches = ({
 
       {isTunMode && (
         <SwitchRow
-          label={t('settings.sections.proxyControl.fields.tunMode')}
+          label={label ?? t('settings.sections.proxyControl.fields.tunMode')}
           active={enable_tun_mode || false}
           infoTitle={t('settings.sections.proxyControl.tooltips.tunMode')}
           onInfoClick={() =>

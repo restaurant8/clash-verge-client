@@ -294,8 +294,8 @@ function clashMetaAlpha() {
   const isWin = platform === 'win32'
   const urlExt = isWin ? 'zip' : 'gz'
   return {
-    name: 'verge-mihomo-alpha',
-    targetFile: `verge-mihomo-alpha-${SIDECAR_HOST}${isWin ? '.exe' : ''}`,
+    name: 'muacloud-mihomo-alpha',
+    targetFile: `muacloud-mihomo-alpha-${SIDECAR_HOST}${isWin ? '.exe' : ''}`,
     exeFile: `${name}${isWin ? '.exe' : ''}`,
     zipFile: `${name}-${META_ALPHA_VERSION}.${urlExt}`,
     downloadURL: `${META_ALPHA_URL_PREFIX}/${name}-${META_ALPHA_VERSION}.${urlExt}`,
@@ -307,8 +307,8 @@ function clashMeta() {
   const isWin = platform === 'win32'
   const urlExt = isWin ? 'zip' : 'gz'
   return {
-    name: 'verge-mihomo',
-    targetFile: `verge-mihomo-${SIDECAR_HOST}${isWin ? '.exe' : ''}`,
+    name: 'muacloud-mihomo',
+    targetFile: `muacloud-mihomo-${SIDECAR_HOST}${isWin ? '.exe' : ''}`,
     exeFile: `${name}${isWin ? '.exe' : ''}`,
     zipFile: `${name}-${META_VERSION}.${urlExt}`,
     downloadURL: `${META_URL_PREFIX}/${META_VERSION}/${name}-${META_VERSION}.${urlExt}`,
@@ -540,9 +540,9 @@ const resolvePlugin = async () => {
 // service chmod (保留并使用 glob)
 const resolveServicePermission = async () => {
   const serviceExecutables = [
-    'clash-verge-service*',
-    'clash-verge-service-install*',
-    'clash-verge-service-uninstall*',
+    'muacloud-service*',
+    'muacloud-service-install*',
+    'muacloud-service-uninstall*',
   ]
   const hashCache = await loadHashCache()
   let hasChanges = false
@@ -576,16 +576,10 @@ const resolveServicePermission = async () => {
 // =======================
 // Other resource resolvers (service, mmdb, geosite, geoip, enableLoopback)
 // =======================
-const SERVICE_LATEST_URL =
-  'https://github.com/clash-verge-rev/clash-verge-service-ipc/releases/latest'
-const SERVICE_URL_PREFIX =
-  'https://github.com/clash-verge-rev/clash-verge-service-ipc/releases/download'
-let SERVICE_VERSION
-
 const SERVICE_BINARIES = [
-  'clash-verge-service',
-  'clash-verge-service-install',
-  'clash-verge-service-uninstall',
+  'muacloud-service',
+  'muacloud-service-install',
+  'muacloud-service-uninstall',
 ]
 
 function serviceFileInfo(name) {
@@ -595,66 +589,6 @@ function serviceFileInfo(name) {
     sourceFile: `${name}${ext}`,
     targetFile: `${name}${suffix}${ext}`,
   }
-}
-
-function parseServiceVersionFromUrl(url) {
-  const match = url.match(/\/releases\/tag\/([^/?#]+)/)
-  return match ? decodeURIComponent(match[1]) : null
-}
-
-async function getLatestServiceVersion() {
-  if (!FORCE) {
-    const cached = await getCachedVersion('SERVICE_VERSION')
-    if (cached) {
-      SERVICE_VERSION = cached
-      return
-    }
-  }
-
-  const options = {}
-  const httpProxy =
-    process.env.HTTP_PROXY ||
-    process.env.http_proxy ||
-    process.env.HTTPS_PROXY ||
-    process.env.https_proxy
-  if (httpProxy) options.agent = new HttpsProxyAgent(httpProxy)
-
-  try {
-    const response = await fetch(SERVICE_LATEST_URL, {
-      ...options,
-      method: 'GET',
-      redirect: 'follow',
-    })
-    if (!response.ok)
-      throw new Error(
-        `Failed to fetch ${SERVICE_LATEST_URL}: ${response.status}`,
-      )
-
-    SERVICE_VERSION = parseServiceVersionFromUrl(response.url)
-    if (!SERVICE_VERSION)
-      throw new Error(
-        `Unable to resolve service release tag from ${response.url}`,
-      )
-
-    log_info(`Latest service version: ${SERVICE_VERSION}`)
-    await setCachedVersion('SERVICE_VERSION', SERVICE_VERSION)
-  } catch (err) {
-    log_error('Error fetching latest service version:', err.message)
-    process.exit(1)
-  }
-}
-
-async function findExtractedFile(dir, fileName) {
-  const entries = await fsp.readdir(dir, { withFileTypes: true })
-  for (const entry of entries) {
-    const entryPath = path.join(dir, entry.name)
-    if (entry.isFile() && entry.name === fileName) return entryPath
-    if (entry.isDirectory()) {
-      const found = await findExtractedFile(entryPath, fileName)
-      if (found) return found
-    }
-  }
-  return null
 }
 
 async function resolveServiceBundle() {
@@ -667,52 +601,33 @@ async function resolveServiceBundle() {
   })
 
   if (!FORCE && files.every(({ targetPath }) => fs.existsSync(targetPath))) {
-    log_success('"clash-verge-service-ipc" already exists, skipping download')
+    log_success('"muacloud-service-ipc" already exists, skipping build')
     return
   }
 
-  await getLatestServiceVersion()
-
-  const archiveExt = platform === 'win32' ? 'zip' : 'tar.gz'
-  const archiveFile = `clash-verge-service-ipc-${SERVICE_VERSION}-${SIDECAR_HOST}.${archiveExt}`
-  const downloadURL = `${SERVICE_URL_PREFIX}/${SERVICE_VERSION}/${archiveFile}`
-  const tempDir = path.join(TEMP_DIR, 'clash-verge-service-ipc')
-  const tempArchive = path.join(tempDir, archiveFile)
-
-  await fsp.mkdir(tempDir, { recursive: true })
+  const targetArg = target ? ` --target ${SIDECAR_HOST}` : ''
+  execSync(
+    `cargo build -p clash_verge_service_ipc --features standalone --bins --release${targetArg}`,
+    { stdio: 'inherit' },
+  )
+  const releaseDir = target
+    ? path.join(cwd, 'target', SIDECAR_HOST, 'release')
+    : path.join(cwd, 'target', 'release')
   await fsp.mkdir(SERVICE_DIR, { recursive: true })
 
-  try {
-    await downloadFile(downloadURL, tempArchive)
-
-    if (platform === 'win32') {
-      const zip = new AdmZip(tempArchive)
-      zip
-        .getEntries()
-        .forEach((entry) =>
-          log_debug('"clash-verge-service-ipc" entry:', entry.entryName),
-        )
-      zip.extractAllTo(tempDir, true)
-    } else {
-      await extract({ cwd: tempDir, file: tempArchive })
+  for (const { sourceFile, targetFile, targetPath } of files) {
+    const builtFile = path.join(releaseDir, sourceFile)
+    if (!fs.existsSync(builtFile)) {
+      throw new Error(`Expected built service binary ${sourceFile} not found`)
     }
 
-    for (const { sourceFile, targetFile, targetPath } of files) {
-      const extractedFile = await findExtractedFile(tempDir, sourceFile)
-      if (!extractedFile) {
-        throw new Error(`Expected binary ${sourceFile} not found in archive`)
-      }
-
-      await fsp.copyFile(extractedFile, targetPath)
-      if (platform !== 'win32') await fsp.chmod(targetPath, 0o755)
-      await updateHashCache(targetPath)
-      log_success(`Extracted service file: ${targetFile}`)
-    }
-
-    log_success(`service bundle finished: ${archiveFile}`)
-  } finally {
-    await fsp.rm(tempDir, { recursive: true, force: true })
+    await fsp.copyFile(builtFile, targetPath)
+    if (platform !== 'win32') await fsp.chmod(targetPath, 0o755)
+    await updateHashCache(targetPath)
+    log_success(`Built service file: ${targetFile}`)
   }
+
+  log_success('muacloud service bundle finished')
 }
 
 const resolveMmdb = () =>
@@ -752,13 +667,13 @@ const resolveUnSetDnsScript = () =>
 // =======================
 const tasks = [
   {
-    name: 'verge-mihomo-alpha',
+    name: 'muacloud-mihomo-alpha',
     func: () =>
       getLatestAlphaVersion().then(() => resolveSidecar(clashMetaAlpha())),
     retry: 5,
   },
   {
-    name: 'verge-mihomo',
+    name: 'muacloud-mihomo',
     func: () =>
       getLatestReleaseVersion().then(() => resolveSidecar(clashMeta())),
     retry: 5,

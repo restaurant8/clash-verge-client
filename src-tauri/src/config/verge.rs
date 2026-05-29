@@ -285,7 +285,7 @@ pub struct IVergeTheme {
 
 impl IVerge {
     /// 有效的clash核心名称
-    pub const VALID_CLASH_CORES: &'static [&'static str] = &["verge-mihomo", "verge-mihomo-alpha"];
+    pub const VALID_CLASH_CORES: &'static [&'static str] = &["muacloud-mihomo", "muacloud-mihomo-alpha"];
 
     /// 验证并修正配置文件中的clash_core值
     pub async fn validate_and_fix_config() -> Result<()> {
@@ -303,26 +303,26 @@ impl IVerge {
                 logging!(
                     warn,
                     Type::Config,
-                    "启动时发现无效的clash_core配置: '{}', 将自动修正为 'verge-mihomo'",
+                    "启动时发现无效的clash_core配置: '{}', 将自动修正为 'muacloud-mihomo'",
                     core
                 );
-                config.clash_core = Some("verge-mihomo".into());
+                config.clash_core = Some("muacloud-mihomo".into());
                 needs_fix = true;
             }
         } else {
             logging!(
                 info,
                 Type::Config,
-                "启动时发现未配置clash_core, 将设置为默认值 'verge-mihomo'"
+                "启动时发现未配置clash_core, 将设置为默认值 'muacloud-mihomo'"
             );
-            config.clash_core = Some("verge-mihomo".into());
+            config.clash_core = Some("muacloud-mihomo".into());
             needs_fix = true;
         }
 
         // 修正后保存配置
         if needs_fix {
             logging!(info, Type::Config, "正在保存修正后的配置文件...");
-            help::save_yaml(&config_path, &config, Some("# Clash Verge Config")).await?;
+            help::save_yaml(&config_path, &config, Some("# MuaCloud Config")).await?;
             logging!(info, Type::Config, "配置文件修正完成，需要重新加载配置");
 
             Self::reload_config_after_fix(config).await?;
@@ -352,7 +352,7 @@ impl IVerge {
     }
 
     pub fn get_valid_clash_core(&self) -> String {
-        self.clash_core.clone().unwrap_or_else(|| "verge-mihomo".into())
+        self.clash_core.clone().unwrap_or_else(|| "muacloud-mihomo".into())
     }
 
     pub async fn new() -> Self {
@@ -383,7 +383,7 @@ impl IVerge {
         Self {
             app_log_max_size: Some(128),
             app_log_max_count: Some(8),
-            clash_core: Some("verge-mihomo".into()),
+            clash_core: Some("muacloud-mihomo".into()),
             language: Some(clash_verge_i18n::system_language().into()),
             theme_mode: Some("system".into()),
             #[cfg(not(target_os = "windows"))]
@@ -412,24 +412,24 @@ impl IVerge {
             pac_file_content: Some(DEFAULT_PAC.into()),
             proxy_host: Some("127.0.0.1".into()),
             #[cfg(not(target_os = "windows"))]
-            verge_redir_port: Some(7895),
+            verge_redir_port: Some(crate::constants::network::ports::DEFAULT_REDIR),
             #[cfg(not(target_os = "windows"))]
             verge_redir_enabled: Some(false),
             #[cfg(target_os = "linux")]
-            verge_tproxy_port: Some(7896),
+            verge_tproxy_port: Some(crate::constants::network::ports::DEFAULT_TPROXY),
             #[cfg(target_os = "linux")]
             verge_tproxy_enabled: Some(false),
-            verge_mixed_port: Some(7897),
-            verge_socks_port: Some(7898),
+            verge_mixed_port: Some(crate::constants::network::ports::DEFAULT_MIXED),
+            verge_socks_port: Some(crate::constants::network::ports::DEFAULT_SOCKS),
             verge_socks_enabled: Some(false),
-            verge_port: Some(7899),
+            verge_port: Some(crate::constants::network::ports::DEFAULT_HTTP),
             verge_http_enabled: Some(false),
             enable_proxy_guard: Some(false),
             enable_bypass_check: Some(true),
             use_default_bypass: Some(true),
             proxy_guard_duration: Some(30),
             auto_close_connection: Some(true),
-            auto_check_update: Some(true),
+            auto_check_update: Some(false),
             enable_builtin_enhanced: Some(true),
             auto_log_clean: Some(2), // 1: 1天, 2: 7天, 3: 30天, 4: 90天
             enable_auto_backup_schedule: Some(false),
@@ -446,7 +446,7 @@ impl IVerge {
             enable_global_hotkey: Some(true),
             enable_auto_light_weight_mode: Some(false),
             auto_light_weight_minutes: Some(10),
-            enable_dns_settings: Some(false),
+            enable_dns_settings: Some(true),
             home_cards: None,
             enable_external_controller: Some(false),
             ..Self::default()
@@ -455,7 +455,7 @@ impl IVerge {
 
     /// Save IVerge App Config
     pub async fn save_file(&self) -> Result<()> {
-        help::save_yaml(&dirs::verge_path()?, &self, Some("# Clash Verge Config")).await
+        help::save_yaml(&dirs::verge_path()?, &self, Some("# MuaCloud Config")).await
     }
 
     /// patch verge config

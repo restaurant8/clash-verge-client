@@ -534,104 +534,72 @@ Function CheckVCRuntime64
 FunctionEnd
 
 
-!macro CheckAllVergeProcesses
-  ; Check if clash-verge-service.exe is running
+!macro CheckAllMuaCloudProcesses
+  ; Check if muacloud-service.exe is running
   !if "${INSTALLMODE}" == "currentUser"
-    nsis_tauri_utils::FindProcessCurrentUser "clash-verge-service.exe"
+    nsis_tauri_utils::FindProcessCurrentUser "muacloud-service.exe"
   !else
-    nsis_tauri_utils::FindProcess "clash-verge-service.exe"
+    nsis_tauri_utils::FindProcess "muacloud-service.exe"
   !endif
   Pop $R0
   ${If} $R0 = 0
-    DetailPrint "Kill clash-verge-service.exe..."
+    DetailPrint "Kill muacloud-service.exe..."
     !if "${INSTALLMODE}" == "currentUser"
-      nsis_tauri_utils::KillProcessCurrentUser "clash-verge-service.exe"
+      nsis_tauri_utils::KillProcessCurrentUser "muacloud-service.exe"
     !else
-      nsis_tauri_utils::KillProcess "clash-verge-service.exe"
+      nsis_tauri_utils::KillProcess "muacloud-service.exe"
     !endif
   ${EndIf}
 
-  ; Check if verge-mihomo-alpha.exe is running
+  ; Check if muacloud-mihomo-alpha.exe is running
   !if "${INSTALLMODE}" == "currentUser"
-    nsis_tauri_utils::FindProcessCurrentUser "verge-mihomo-alpha.exe"
+    nsis_tauri_utils::FindProcessCurrentUser "muacloud-mihomo-alpha.exe"
   !else
-    nsis_tauri_utils::FindProcess "verge-mihomo-alpha.exe"
+    nsis_tauri_utils::FindProcess "muacloud-mihomo-alpha.exe"
   !endif
   Pop $R0
   ${If} $R0 = 0
-    DetailPrint "Kill verge-mihomo-alpha.exe..."
+    DetailPrint "Kill muacloud-mihomo-alpha.exe..."
     !if "${INSTALLMODE}" == "currentUser"
-      nsis_tauri_utils::KillProcessCurrentUser "verge-mihomo-alpha.exe"
+      nsis_tauri_utils::KillProcessCurrentUser "muacloud-mihomo-alpha.exe"
     !else
-      nsis_tauri_utils::KillProcess "verge-mihomo-alpha.exe"
+      nsis_tauri_utils::KillProcess "muacloud-mihomo-alpha.exe"
     !endif
   ${EndIf}
 
-  ; Check if verge-mihomo.exe is running
+  ; Check if muacloud-mihomo.exe is running
   !if "${INSTALLMODE}" == "currentUser"
-    nsis_tauri_utils::FindProcessCurrentUser "verge-mihomo.exe"
+    nsis_tauri_utils::FindProcessCurrentUser "muacloud-mihomo.exe"
   !else
-    nsis_tauri_utils::FindProcess "verge-mihomo.exe"
+    nsis_tauri_utils::FindProcess "muacloud-mihomo.exe"
   !endif
   Pop $R0
   ${If} $R0 = 0
-    DetailPrint "Kill verge-mihomo.exe..."
+    DetailPrint "Kill muacloud-mihomo.exe..."
     !if "${INSTALLMODE}" == "currentUser"
-      nsis_tauri_utils::KillProcessCurrentUser "verge-mihomo.exe"
+      nsis_tauri_utils::KillProcessCurrentUser "muacloud-mihomo.exe"
     !else
-      nsis_tauri_utils::KillProcess "verge-mihomo.exe"
-    !endif
-  ${EndIf}
-
-  ; Check if clash-meta-alpha.exe is running
-  !if "${INSTALLMODE}" == "currentUser"
-    nsis_tauri_utils::FindProcessCurrentUser "clash-meta-alpha.exe"
-  !else
-    nsis_tauri_utils::FindProcess "clash-meta-alpha.exe"
-  !endif
-  Pop $R0
-  ${If} $R0 = 0
-    DetailPrint "Kill clash-meta-alpha.exe..."
-    !if "${INSTALLMODE}" == "currentUser"
-      nsis_tauri_utils::KillProcessCurrentUser "clash-meta-alpha.exe"
-    !else
-      nsis_tauri_utils::KillProcess "clash-meta-alpha.exe"
-    !endif
-  ${EndIf}
-
-  ; Check if clash-meta.exe is running
-  !if "${INSTALLMODE}" == "currentUser"
-    nsis_tauri_utils::FindProcessCurrentUser "clash-meta.exe"
-  !else
-    nsis_tauri_utils::FindProcess "clash-meta.exe"
-  !endif
-  Pop $R0
-  ${If} $R0 = 0
-    DetailPrint "Kill clash-meta.exe..."
-    !if "${INSTALLMODE}" == "currentUser"
-      nsis_tauri_utils::KillProcessCurrentUser "clash-meta.exe"
-    !else
-      nsis_tauri_utils::KillProcess "clash-meta.exe"
+      nsis_tauri_utils::KillProcess "muacloud-mihomo.exe"
     !endif
   ${EndIf}
 !macroend
 
-!macro StartVergeService
+!macro StartMuaCloudService
   ; Check if the service exists
-  SimpleSC::ExistsService "clash_verge_service"
+  SimpleSC::ExistsService "muacloud_service"
   Pop $0  ; 0: service exists; other: service not exists
   ; Service exists
   ${If} $0 == 0
     Push $0
     ; Check if the service is running
-    SimpleSC::ServiceIsRunning "clash_verge_service"
+    SimpleSC::ServiceIsRunning "muacloud_service"
     Pop $0 ; returns an errorcode (<>0) otherwise success (0)
     Pop $1 ; returns 1 (service is running) - returns 0 (service is not running)
     ${If} $0 == 0
       Push $0
       ${If} $1 == 0
         DetailPrint "Restart ${PRODUCTNAME} Service..."
-        SimpleSC::StartService "clash_verge_service" "" 30
+        SimpleSC::StartService "muacloud_service" "" 30
       ${EndIf}
     ${ElseIf} $0 != 0
       Push $0
@@ -642,26 +610,26 @@ FunctionEnd
   ${EndIf}
 !macroend
 
-!macro RemoveVergeService
+!macro RemoveMuaCloudService
   ; Check if the service exists
-  SimpleSC::ExistsService "clash_verge_service"
+  SimpleSC::ExistsService "muacloud_service"
   Pop $0  ; 0: service exists; other: service not exists
   ; Service exists
   ${If} $0 == 0
     Push $0
     ; Check if the service is running
-    SimpleSC::ServiceIsRunning "clash_verge_service"
+    SimpleSC::ServiceIsRunning "muacloud_service"
     Pop $0 ; returns an errorcode (<>0) otherwise success (0)
     Pop $1 ; returns 1 (service is running) - returns 0 (service is not running)
     ${If} $0 == 0
       Push $0
       ${If} $1 == 1
         DetailPrint "Stop ${PRODUCTNAME} Service..."
-        SimpleSC::StopService "clash_verge_service" 1 30
+        SimpleSC::StopService "muacloud_service" 1 30
         Pop $0 ; returns an errorcode (<>0) otherwise success (0)
         ${If} $0 == 0
           DetailPrint "Removing ${PRODUCTNAME} Service..."
-          SimpleSC::RemoveService "clash_verge_service"
+          SimpleSC::RemoveService "muacloud_service"
         ${ElseIf} $0 != 0
           Push $0
           SimpleSC::GetErrorMessage
@@ -670,7 +638,7 @@ FunctionEnd
         ${EndIf}
       ${ElseIf} $1 == 0
         DetailPrint "Removing ${PRODUCTNAME} Service..."
-        SimpleSC::RemoveService "clash_verge_service"
+        SimpleSC::RemoveService "muacloud_service"
       ${EndIf}
     ${ElseIf} $0 != 0
       Push $0
@@ -887,7 +855,7 @@ Section Install
   nsExec::Exec 'netsh int tcp res'
 
   !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
-  !insertmacro CheckAllVergeProcesses
+  !insertmacro CheckAllMuaCloudProcesses
 
   ; Ensure startup folders exist
   CreateDirectory "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup"
@@ -900,33 +868,33 @@ Section Install
 
   ; Remove stale window-state files
   DetailPrint "Removing window-state.json / .window-state.json"
-  Delete "$APPDATA\io.github.clash-verge-rev.clash-verge-rev\window-state.json"
-  Delete "$APPDATA\io.github.clash-verge-rev.clash-verge-rev\.window-state.json"
+  Delete "$APPDATA\${BUNDLEID}\window-state.json"
+  Delete "$APPDATA\${BUNDLEID}\.window-state.json"
 
   ; Clean legacy auto-launch registry entries
   StrCpy $R1 "Software\Microsoft\Windows\CurrentVersion\Run"
 
   SetRegView 64
-  ReadRegStr $R2 HKCU "$R1" "Clash Verge"
+  ReadRegStr $R2 HKCU "$R1" "MuaCloud"
   ${If} $R2 != ""
-    DeleteRegValue HKCU "$R1" "Clash Verge"
+    DeleteRegValue HKCU "$R1" "MuaCloud"
   ${EndIf}
-  ReadRegStr $R2 HKLM "$R1" "Clash Verge"
+  ReadRegStr $R2 HKLM "$R1" "MuaCloud"
   ${If} $R2 != ""
-    DeleteRegValue HKLM "$R1" "Clash Verge"
+    DeleteRegValue HKLM "$R1" "MuaCloud"
   ${EndIf}
-  ReadRegStr $R2 HKCU "$R1" "clash-verge"
+  ReadRegStr $R2 HKCU "$R1" "muacloud-client"
   ${If} $R2 != ""
-    DeleteRegValue HKCU "$R1" "clash-verge"
+    DeleteRegValue HKCU "$R1" "muacloud-client"
   ${EndIf}
-  ReadRegStr $R2 HKLM "$R1" "clash-verge"
+  ReadRegStr $R2 HKLM "$R1" "muacloud-client"
   ${If} $R2 != ""
-    DeleteRegValue HKLM "$R1" "clash-verge"
+    DeleteRegValue HKLM "$R1" "muacloud-client"
   ${EndIf}
 
   ; Remove legacy executables
-  IfFileExists "$INSTDIR\Clash Verge.exe" 0 +2
-    Delete "$INSTDIR\Clash Verge.exe"
+  IfFileExists "$INSTDIR\MuaCloud.exe" 0 +2
+    Delete "$INSTDIR\MuaCloud.exe"
 
   !insertmacro SetContext
 
@@ -946,7 +914,7 @@ Section Install
     File /a "/oname={{this}}" "{{no-escape @key}}"
   {{/each}}
 
-  !insertmacro StartVergeService
+  !insertmacro StartMuaCloudService
 
   ; Create file associations
   {{#each file_associations as |association| ~}}
@@ -1068,39 +1036,39 @@ Section Uninstall
   !endif
 
   !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
-  !insertmacro CheckAllVergeProcesses
-  !insertmacro RemoveVergeService
+  !insertmacro CheckAllMuaCloudProcesses
+  !insertmacro RemoveMuaCloudService
 
   ; Remove cached window state files
   DetailPrint "Removing window-state.json / .window-state.json"
   SetShellVarContext current
-  Delete "$APPDATA\io.github.clash-verge-rev.clash-verge-rev\window-state.json"
-  Delete "$APPDATA\io.github.clash-verge-rev.clash-verge-rev\.window-state.json"
+  Delete "$APPDATA\${BUNDLEID}\window-state.json"
+  Delete "$APPDATA\${BUNDLEID}\.window-state.json"
 
   ; Clean legacy auto-launch registry entries
   StrCpy $R1 "Software\Microsoft\Windows\CurrentVersion\Run"
 
   SetRegView 64
-  ReadRegStr $R2 HKCU "$R1" "Clash Verge"
+  ReadRegStr $R2 HKCU "$R1" "MuaCloud"
   ${If} $R2 != ""
-    DeleteRegValue HKCU "$R1" "Clash Verge"
+    DeleteRegValue HKCU "$R1" "MuaCloud"
   ${EndIf}
-  ReadRegStr $R2 HKLM "$R1" "Clash Verge"
+  ReadRegStr $R2 HKLM "$R1" "MuaCloud"
   ${If} $R2 != ""
-    DeleteRegValue HKLM "$R1" "Clash Verge"
+    DeleteRegValue HKLM "$R1" "MuaCloud"
   ${EndIf}
-  ReadRegStr $R2 HKCU "$R1" "clash-verge"
+  ReadRegStr $R2 HKCU "$R1" "muacloud-client"
   ${If} $R2 != ""
-    DeleteRegValue HKCU "$R1" "clash-verge"
+    DeleteRegValue HKCU "$R1" "muacloud-client"
   ${EndIf}
-  ReadRegStr $R2 HKLM "$R1" "clash-verge"
+  ReadRegStr $R2 HKLM "$R1" "muacloud-client"
   ${If} $R2 != ""
-    DeleteRegValue HKLM "$R1" "clash-verge"
+    DeleteRegValue HKLM "$R1" "muacloud-client"
   ${EndIf}
 
   ; Remove legacy executables
-  IfFileExists "$INSTDIR\Clash Verge.exe" 0 +2
-    Delete "$INSTDIR\Clash Verge.exe"
+  IfFileExists "$INSTDIR\MuaCloud.exe" 0 +2
+    Delete "$INSTDIR\MuaCloud.exe"
 
   !insertmacro SetContext
 
@@ -1171,8 +1139,8 @@ Section Uninstall
     ${EndIf}
 
     ; Remove legacy public desktop shortcuts
-    Delete "C:\Users\Public\Desktop\Clash Verge.lnk"
-    Delete "C:\Users\Public\Desktop\clash-verge.lnk"
+    Delete "C:\Users\Public\Desktop\MuaCloud.lnk"
+    Delete "C:\Users\Public\Desktop\muacloud-client.lnk"
 
     ; Remove legacy shortcuts from all user desktops
     DetailPrint "Removing ${PRODUCTNAME} shortcuts from all user desktops..."
@@ -1186,8 +1154,8 @@ Section Uninstall
       ReadRegStr $R3 HKLM "SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\$R2" "ProfileImagePath"
       ${If} $R3 != ""
         StrCpy $R4 "$R3\Desktop"
-        Delete "$R4\Clash Verge.lnk"
-        Delete "$R4\clash-verge.lnk"
+        Delete "$R4\MuaCloud.lnk"
+        Delete "$R4\muacloud-client.lnk"
       ${EndIf}
       IntOp $R1 $R1 + 1
       Goto LegacyUserLoop
@@ -1196,22 +1164,19 @@ Section Uninstall
 
     ; Remove legacy start menu folders
     SetShellVarContext current
-    RMDir /r /REBOOTOK "$SMPROGRAMS\Clash Verge"
-    RMDir /r /REBOOTOK "$SMPROGRAMS\clash-verge"
+    RMDir /r /REBOOTOK "$SMPROGRAMS\MuaCloud"
+    RMDir /r /REBOOTOK "$SMPROGRAMS\muacloud-client"
     !insertmacro SetContext
-    RMDir /r /REBOOTOK "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Clash Verge"
-    RMDir /r /REBOOTOK "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\clash-verge"
+    RMDir /r /REBOOTOK "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\MuaCloud"
+    RMDir /r /REBOOTOK "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\muacloud-client"
 
     ; Clean legacy registry keys
     SetRegView 64
-    DeleteRegKey HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\Clash Verge.exe"
-    DeleteRegKey HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\clash-verge.exe"
-    DeleteRegKey HKLM "Software\Clash Verge Rev"
-    DeleteRegKey HKLM "Software\Clash Verge"
-    DeleteRegKey HKCU "Software\Clash Verge Rev"
-    DeleteRegKey HKCU "Software\Clash Verge"
-    DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\ClashVerge"
-    DeleteRegKey HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Clash Verge"
+    DeleteRegKey HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\MuaCloud.exe"
+    DeleteRegKey HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\muacloud-client.exe"
+    DeleteRegKey HKLM "Software\MuaCloud"
+    DeleteRegKey HKCU "Software\MuaCloud"
+    DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MuaCloud"
 
     StrCpy $R1 0
     LegacyUninstallLoop:
@@ -1221,8 +1186,8 @@ Section Uninstall
       ${EndIf}
       ReadRegStr $R3 HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$R2" "DisplayName"
       ${If} $R3 != ""
-        StrCmp $R3 "Clash Verge" 0 +3
-        StrCmp $R3 "clash-verge" 0 +2
+        StrCmp $R3 "MuaCloud" 0 +3
+        StrCmp $R3 "muacloud-client" 0 +2
         DeleteRegKey HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$R2"
       ${EndIf}
       IntOp $R1 $R1 + 1

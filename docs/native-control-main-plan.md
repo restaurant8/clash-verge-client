@@ -413,10 +413,23 @@ UI 相关配置来源优先级：
 - `invite_domain`
 - `crisp_id`
 - `discount_delay_seconds`
+- `delay_display_scale`
 - `version`
 - `update_notes`
 - `force_update`
 - `latest_client_url`
+- `windows_version`
+- `windows_download_url`
+- `windows_update_notes`
+- `windows_force_update`
+- `macos_version`
+- `macos_download_url`
+- `macos_update_notes`
+- `macos_force_update`
+- `android_version`
+- `android_download_url`
+- `android_update_notes`
+- `android_force_update`
 
 可以新增结构化主题字段，但不能删除或改变以上字段含义。
 

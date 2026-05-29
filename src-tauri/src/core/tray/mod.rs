@@ -39,7 +39,7 @@ use menu_def::{MenuIds, MenuTexts};
 type ProxyMenuItem = (Option<Submenu<Wry>>, Vec<Box<dyn IsMenuItem<Wry>>>);
 
 const TRAY_CLICK_DEBOUNCE_MS: u64 = 300;
-pub const TRAY_ID: &str = "clash-verge-rev-tray";
+pub const TRAY_ID: &str = "muacloud-tray";
 
 #[derive(Clone)]
 struct TrayState {}

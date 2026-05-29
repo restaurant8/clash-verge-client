@@ -1,6 +1,7 @@
 import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { stopCore } from '@/services/cmds'
+import { setDelayDisplayScale } from '@/services/delay'
 import { showNotice } from '@/services/notice-service'
 import { XboardApiClient } from '@/services/xboard/api'
 import {
@@ -130,6 +131,10 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
   })
 
   const client = useMemo(() => buildClient(remote), [remote])
+
+  useEffect(() => {
+    setDelayDisplayScale(remote.remoteConfig.delay_display_scale)
+  }, [remote.remoteConfig.delay_display_scale])
 
   const refreshRemoteConfig = useCallback(async (force = false) => {
     const next = await resolveXboardRemoteConfig({ force })

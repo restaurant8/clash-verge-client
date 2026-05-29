@@ -1,5 +1,4 @@
 import {
-  DirectionsRounded,
   LanguageRounded,
   MultipleStopRounded,
 } from '@mui/icons-material'
@@ -9,6 +8,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { closeAllConnections } from 'tauri-plugin-mihomo-api'
 
+import { CurrentNodeSelector } from '@/components/home/current-node-selector'
 import { useVerge } from '@/hooks/use-verge'
 import {
   useAppRefreshers,
@@ -18,11 +18,15 @@ import {
 import { patchClashMode } from '@/services/cmds'
 import type { TranslationKey } from '@/types/generated/i18n-keys'
 
-const CLASH_MODES = ['rule', 'global', 'direct'] as const
+const CLASH_MODES = ['rule', 'global'] as const
 type ClashMode = (typeof CLASH_MODES)[number]
 
 const isClashMode = (mode: string): mode is ClashMode =>
   (CLASH_MODES as readonly string[]).includes(mode)
+
+interface ClashModeCardProps {
+  showCurrentNodeSelector?: boolean
+}
 
 const MODE_META: Record<
   ClashMode,
@@ -36,13 +40,11 @@ const MODE_META: Record<
     label: 'home.components.clashMode.labels.global',
     description: 'home.components.clashMode.descriptions.global',
   },
-  direct: {
-    label: 'home.components.clashMode.labels.direct',
-    description: 'home.components.clashMode.descriptions.direct',
-  },
 }
 
-export const ClashModeCard = () => {
+export const ClashModeCard = ({
+  showCurrentNodeSelector = false,
+}: ClashModeCardProps) => {
   const { t } = useTranslation()
   const { verge } = useVerge()
   const { clashConfig } = useClashConfigData()
@@ -66,15 +68,17 @@ export const ClashModeCard = () => {
     if (isCoreDataPending) {
       return '\u00A0'
     }
+    if (currentMode === 'direct') {
+      return '当前为直连模式，请切换为规则或全局'
+    }
     return t('home.components.clashMode.errors.communication')
-  }, [currentModeKey, isCoreDataPending, t])
+  }, [currentMode, currentModeKey, isCoreDataPending, t])
 
   // 模式图标映射
   const modeIcons = useMemo(
     () => ({
       rule: <MultipleStopRounded fontSize="small" />,
       global: <LanguageRounded fontSize="small" />,
-      direct: <DirectionsRounded fontSize="small" />,
     }),
     [],
   )
@@ -118,7 +122,7 @@ export const ClashModeCard = () => {
       transform: 'translateY(1px)',
     },
     '&::after':
-      mode === currentModeKey
+      mode === currentModeKey && !showCurrentNodeSelector
         ? {
             content: '""',
             position: 'absolute',
@@ -181,6 +185,12 @@ export const ClashModeCard = () => {
           </Paper>
         ))}
       </Stack>
+
+      {showCurrentNodeSelector && (
+        <Box sx={{ px: { xs: 0, sm: 2 }, pb: 0.5 }}>
+          <CurrentNodeSelector />
+        </Box>
+      )}
 
       {/* 说明文本区域 */}
       <Box

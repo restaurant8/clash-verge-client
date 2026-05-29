@@ -9,7 +9,7 @@ import type {
 export const XBOARD_REMOTE_CONFIG_URLS = [
   'https://d1m6vp8arykpci.cloudfront.net/client-config.env',
   'https://raw.githubusercontent.com/muacloud/s3work/main/client-config.env',
-  'https://a.pipupipuapi.xyz/client-config.env',
+  'https://a.4iox.com/client-config.env',
   'https://muafq.xyz/client-config.env',
 ] as const
 
@@ -33,10 +33,23 @@ export const XBOARD_SEED_REMOTE_CONFIG: XboardRemoteConfig = {
   crisp_id: XBOARD_DEFAULT_CRISP_ID,
   imgbb_api_key: '',
   discount_delay_seconds: 0,
+  delay_display_scale: 0.5,
   version: '1.0.0',
   update_notes: '',
   force_update: false,
   latest_client_url: '',
+  windows_version: '',
+  windows_download_url: '',
+  windows_update_notes: '',
+  windows_force_update: false,
+  macos_version: '',
+  macos_download_url: '',
+  macos_update_notes: '',
+  macos_force_update: false,
+  android_version: '',
+  android_download_url: '',
+  android_update_notes: '',
+  android_force_update: false,
 }
 
 const CACHE_KEY = 'xboard.remote-config.v2'
@@ -65,6 +78,17 @@ const toInteger = (value: unknown, fallback: number) => {
   const parsed = Number.parseInt(String(value ?? ''), 10)
   return Number.isFinite(parsed) ? parsed : fallback
 }
+
+const toNumber = (value: unknown, fallback: number) => {
+  const parsed = Number.parseFloat(String(value ?? ''))
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+const clampNumber = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value))
+
+const firstConfigValue = (...values: unknown[]) =>
+  values.find((value) => value !== undefined && value !== null && value !== '')
 
 export const parseDomainList = (...values: unknown[]) => {
   const domains = values
@@ -138,10 +162,48 @@ export const normalizeRemoteConfig = (
     crisp_id: String(merged.crisp_id || XBOARD_SEED_REMOTE_CONFIG.crisp_id),
     imgbb_api_key: String(merged.imgbb_api_key || ''),
     discount_delay_seconds: toInteger(merged.discount_delay_seconds, 0),
+    delay_display_scale: clampNumber(
+      toNumber(
+        merged.delay_display_scale,
+        XBOARD_SEED_REMOTE_CONFIG.delay_display_scale,
+      ),
+      0.1,
+      1,
+    ),
     version: String(merged.version || XBOARD_SEED_REMOTE_CONFIG.version),
     update_notes: String(merged.update_notes || ''),
     force_update: toBoolean(merged.force_update),
     latest_client_url: String(merged.latest_client_url || ''),
+    windows_version: String(merged.windows_version || merged.version || ''),
+    windows_download_url: String(
+      merged.windows_download_url || merged.latest_client_url || '',
+    ),
+    windows_update_notes: String(
+      merged.windows_update_notes || merged.update_notes || '',
+    ),
+    windows_force_update: toBoolean(
+      firstConfigValue(input?.windows_force_update, merged.force_update),
+    ),
+    macos_version: String(merged.macos_version || merged.version || ''),
+    macos_download_url: String(
+      merged.macos_download_url || merged.latest_client_url || '',
+    ),
+    macos_update_notes: String(
+      merged.macos_update_notes || merged.update_notes || '',
+    ),
+    macos_force_update: toBoolean(
+      firstConfigValue(input?.macos_force_update, merged.force_update),
+    ),
+    android_version: String(merged.android_version || merged.version || ''),
+    android_download_url: String(
+      merged.android_download_url || merged.latest_client_url || '',
+    ),
+    android_update_notes: String(
+      merged.android_update_notes || merged.update_notes || '',
+    ),
+    android_force_update: toBoolean(
+      firstConfigValue(input?.android_force_update, merged.force_update),
+    ),
   }
 }
 

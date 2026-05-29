@@ -1,11 +1,11 @@
 [package]
-name = "clash-verge"
+name = "muacloud-client"
 version = "2.5.2"
-description = "clash verge"
+description = "MuaCloud Native Control Client"
 authors = ["zzzgydi", "Tunglies", "wonfen", "MystiPanda"]
 license = "GPL-3.0-only"
-repository = "https://github.com/clash-verge-rev/clash-verge-rev.git"
-default-run = "clash-verge"
+repository = "https://github.com/muacloud/muacloud-client.git"
+default-run = "muacloud-client"
 build = "build.rs"
 edition = "2024"
 rust-version = "1.95"
@@ -24,7 +24,7 @@ clippy = ["tauri/test"]
 tracing = []
 
 [package.metadata.bundle]
-identifier = "io.github.clash-verge-rev.clash-verge-rev"
+identifier = "com.muacloud.client"
 
 [build-dependencies]
 tauri-build = { version = "2.6.2", features = [] }
@@ -98,9 +98,7 @@ tauri-plugin-devtools = { version = "2.1.0" }
 tauri-plugin-mihomo = { git = "https://github.com/clash-verge-rev/tauri-plugin-mihomo" }
 clash_verge_logger = { git = "https://github.com/clash-verge-rev/clash-verge-logger" }
 async-trait = "0.1.89"
-clash_verge_service_ipc = { version = "2.3.0", features = [
-  "client",
-], git = "https://github.com/clash-verge-rev/clash-verge-service-ipc" }
+clash_verge_service_ipc = { workspace = true, features = ["client"] }
 arc-swap = "1.9.1"
 tokio-rustls = "0.26.4"
 rustls = { version = "0.23.40", features = ["ring"] }

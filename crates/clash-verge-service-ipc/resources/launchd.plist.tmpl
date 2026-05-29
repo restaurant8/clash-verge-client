@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.muacloud.client.service</string>
+
+    <key>AssociatedBundleIdentifiers</key>
+    <array>
+        <string>com.muacloud.client</string>
+    </array>
+
+    <key>MachServices</key>
+    <dict>
+        <key>com.muacloud.client.service</key>
+        <true/>
+    </dict>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Library/PrivilegedHelperTools/com.muacloud.client.service.bundle/Contents/MacOS/muacloud-service</string>
+    </array>
+
+    <key>GroupName</key>
+    <string>{group_name}</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+</dict>
+</plist>

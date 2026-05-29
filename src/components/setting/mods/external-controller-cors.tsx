@@ -16,7 +16,8 @@ import { showNotice } from '@/services/notice-service'
 const DEV_URLS = [
   'tauri://localhost',
   'http://tauri.localhost',
-  'http://localhost:3000',
+  'http://localhost:3100',
+  'http://127.0.0.1:3100',
 ]
 
 // 获取完整的源列表，包括开发URL

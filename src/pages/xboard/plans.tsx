@@ -66,6 +66,9 @@ type CouponPreview = CouponTarget & {
   coupon: XboardRecord
 }
 
+const couponPreviewKey = (planId: string | number, period: string) =>
+  `${String(planId)}::${period}`
+
 const availablePeriods = (plan: any) =>
   PERIODS.filter(([key]) => Number(plan[key] ?? 0) > 0)
 
@@ -173,7 +176,9 @@ const PlansPage = () => {
   const [refreshingPlans, setRefreshingPlans] = useState(false)
   const [detailPlan, setDetailPlan] = useState<string | null>(null)
   const [checkingCoupon, setCheckingCoupon] = useState(false)
-  const [checkedCoupon, setCheckedCoupon] = useState<CouponPreview | null>(null)
+  const [checkedCoupons, setCheckedCoupons] = useState<
+    Record<string, CouponPreview>
+  >({})
 
   useEffect(() => {
     void loadPlans()
@@ -196,7 +201,7 @@ const PlansPage = () => {
     remote.bootstrap?.features?.plan_change_enable,
   )
   const surplusEnabled = pickBool(
-    true,
+    false,
     appConfig?.features?.surplus_enable,
     appConfig?.business_rules?.surplus_enable,
     remote.bootstrap?.features?.surplus_enable,
@@ -210,7 +215,8 @@ const PlansPage = () => {
     hasValue(planId) &&
     String(currentPlanId) !== String(planId)
 
-  const couponTarget = useMemo<CouponTarget | null>(() => {
+  const couponTargets = useMemo<CouponTarget[]>(() => {
+    const targets: CouponTarget[] = []
     for (let index = 0; index < plans.length; index += 1) {
       const plan = plans[index]
       const planId = getId(plan)
@@ -218,20 +224,21 @@ const PlansPage = () => {
       const key = String(planId)
       const period = periodByPlan[key] || availablePeriods(plan)[0]?.[0]
       if (period) {
-        return {
+        targets.push({
           planId,
           period,
           planName: String(plan.name ?? `套餐 ${index + 1}`),
-        }
+        })
       }
     }
-    return null
+    return targets
   }, [periodByPlan, plans])
 
   const verifyCoupon = async (
     target: CouponTarget | null,
     interactive: boolean,
-  ) => {
+    updatePreview = true,
+  ): Promise<CouponPreview | null> => {
     if (!session) return null
 
     const code = coupon.trim()
@@ -271,28 +278,44 @@ const PlansPage = () => {
         couponData.code
       const backendText =
         typeof backendMessage === 'string' ? backendMessage : ''
-      setCheckedCoupon({
+      const preview = {
         ...target,
         code,
         coupon: couponData,
-      })
-      setCouponMessageType('success')
-      setCouponMessage(
-        String(
-          backendText &&
-            backendText !== '操作成功' &&
-            backendText.toLowerCase() !== 'success'
-            ? backendText
-            : `已应用优惠：${describeCoupon(couponData)}`,
-        ),
-      )
-      return result
+      }
+      if (updatePreview) {
+        setCheckedCoupons((prev) => ({
+          ...prev,
+          [couponPreviewKey(target.planId, target.period)]: preview,
+        }))
+      }
+      if (interactive) {
+        setCouponMessageType('success')
+        setCouponMessage(
+          String(
+            backendText &&
+              backendText !== '操作成功' &&
+              backendText.toLowerCase() !== 'success'
+              ? backendText
+              : `已应用优惠：${describeCoupon(couponData)}`,
+          ),
+        )
+      }
+      return preview
     } catch (error) {
-      setCheckedCoupon(null)
-      setCouponMessageType('error')
-      setCouponMessage(
-        error instanceof Error ? error.message : '优惠码不可用，请检查后重试',
-      )
+      if (target && updatePreview) {
+        setCheckedCoupons((prev) => {
+          const next = { ...prev }
+          delete next[couponPreviewKey(target.planId, target.period)]
+          return next
+        })
+      }
+      if (interactive) {
+        setCouponMessageType('error')
+        setCouponMessage(
+          error instanceof Error ? error.message : '优惠码不可用，请检查后重试',
+        )
+      }
       throw error
     } finally {
       if (interactive) {
@@ -302,10 +325,56 @@ const PlansPage = () => {
   }
 
   const checkCoupon = useLockFn(async () => {
+    if (!coupon.trim()) {
+      setCouponMessageType('error')
+      setCouponMessage('请先输入优惠码')
+      return
+    }
+
+    if (!couponTargets.length) {
+      setCouponMessageType('error')
+      setCouponMessage('请选择可购买套餐后再检查优惠码')
+      return
+    }
+
+    setCheckingCoupon(true)
+    setCouponMessageType('info')
+    setCouponMessage(`正在检查 ${couponTargets.length} 个套餐周期`)
+
+    const previews: Record<string, CouponPreview> = {}
+    const failures: string[] = []
+
     try {
-      await verifyCoupon(couponTarget, true)
-    } catch {
-      // The field helper text already shows the backend validation message.
+      for (const target of couponTargets) {
+        try {
+          const preview = await verifyCoupon(target, false, false)
+          if (preview) {
+            previews[couponPreviewKey(target.planId, target.period)] = preview
+          }
+        } catch {
+          failures.push(target.planName)
+        }
+      }
+
+      setCheckedCoupons(previews)
+
+      const appliedPreviews = Object.values(previews)
+      if (!appliedPreviews.length) {
+        setCouponMessageType('error')
+        setCouponMessage('优惠码不适用于当前可购买套餐')
+        return
+      }
+
+      setCouponMessageType('success')
+      setCouponMessage(
+        `已应用优惠：${describeCoupon(appliedPreviews[0].coupon)}，适用于 ${
+          appliedPreviews.length
+        } 个套餐周期${
+          failures.length ? `，${failures.length} 个套餐不可用` : ''
+        }`,
+      )
+    } finally {
+      setCheckingCoupon(false)
     }
   })
 
@@ -511,7 +580,7 @@ const PlansPage = () => {
                 value={coupon}
                 onChange={(event) => {
                   setCoupon(event.target.value)
-                  setCheckedCoupon(null)
+                  setCheckedCoupons({})
                   if (event.target.value.trim()) {
                     setCouponMessageType('info')
                     setCouponMessage('下单时会先校验优惠码')
@@ -536,7 +605,7 @@ const PlansPage = () => {
                           size="small"
                           variant="text"
                           disabled={
-                            !coupon.trim() || !couponTarget || checkingCoupon
+                            !coupon.trim() || !couponTargets.length || checkingCoupon
                           }
                           startIcon={
                             checkingCoupon ? (
@@ -587,11 +656,12 @@ const PlansPage = () => {
               const periods = availablePeriods(plan)
               const period = periodByPlan[key] || periods[0]?.[0] || ''
               const price = plan[period]
+              const couponPreview = period
+                ? checkedCoupons[couponPreviewKey(planId, period)]
+                : undefined
               const appliedCoupon =
-                checkedCoupon?.code === coupon.trim() &&
-                String(checkedCoupon.planId) === String(planId) &&
-                checkedCoupon.period === period
-                  ? checkedCoupon.coupon
+                couponPreview?.code === coupon.trim()
+                  ? couponPreview.coupon
                   : undefined
               const discountedPrice = getDiscountedPrice(price, appliedCoupon)
               const discountAmount = numberValue(price) - discountedPrice
@@ -604,8 +674,8 @@ const PlansPage = () => {
                     title={plan.name ?? `套餐 ${index + 1}`}
                     action={
                       <Stack direction="row" spacing={0.75}>
-                        {planChangeOrder && surplusEnabled && (
-                          <Chip size="small" color="info" label="后台折抵" />
+                        {index === 0 && (
+                          <Chip size="small" color="error" label="热销" />
                         )}
                         <Chip
                           icon={<CheckCircleRounded />}
@@ -654,7 +724,7 @@ const PlansPage = () => {
                         label="周期"
                         value={period}
                         onChange={(event) => {
-                          setCheckedCoupon(null)
+                          setCheckedCoupons({})
                           if (coupon.trim()) {
                             setCouponMessageType('info')
                             setCouponMessage('周期已变化，请重新检查优惠码')

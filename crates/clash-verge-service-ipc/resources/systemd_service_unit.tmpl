@@ -1,0 +1,13 @@
+[Unit]
+Description=MuaCloud Service helps to launch Mihomo Core.
+After=network-online.target nftables.service iptables.service
+
+[Service]
+Type=simple
+ExecStart={exec_start}
+Group={group}
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

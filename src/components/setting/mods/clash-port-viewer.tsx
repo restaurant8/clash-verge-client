@@ -37,23 +37,23 @@ export const ClashPortViewer = forwardRef<ClashPortViewerRef>((_, ref) => {
 
   // Mixed Port
   const [mixedPort, setMixedPort] = useState(
-    verge?.verge_mixed_port ?? clashInfo?.mixed_port ?? 7897,
+    verge?.verge_mixed_port ?? clashInfo?.mixed_port ?? 17997,
   )
 
   // 其他端口状态
-  const [socksPort, setSocksPort] = useState(verge?.verge_socks_port ?? 7898)
+  const [socksPort, setSocksPort] = useState(verge?.verge_socks_port ?? 17998)
   const [socksEnabled, setSocksEnabled] = useState(
     verge?.verge_socks_enabled ?? false,
   )
-  const [httpPort, setHttpPort] = useState(verge?.verge_port ?? 7899)
+  const [httpPort, setHttpPort] = useState(verge?.verge_port ?? 17999)
   const [httpEnabled, setHttpEnabled] = useState(
     verge?.verge_http_enabled ?? false,
   )
-  const [redirPort, setRedirPort] = useState(verge?.verge_redir_port ?? 7895)
+  const [redirPort, setRedirPort] = useState(verge?.verge_redir_port ?? 17995)
   const [redirEnabled, setRedirEnabled] = useState(
     verge?.verge_redir_enabled ?? false,
   )
-  const [tproxyPort, setTproxyPort] = useState(verge?.verge_tproxy_port ?? 7896)
+  const [tproxyPort, setTproxyPort] = useState(verge?.verge_tproxy_port ?? 17996)
   const [tproxyEnabled, setTproxyEnabled] = useState(
     verge?.verge_tproxy_enabled ?? false,
   )
@@ -82,14 +82,14 @@ export const ClashPortViewer = forwardRef<ClashPortViewerRef>((_, ref) => {
   useImperativeHandle(ref, () => ({
     open: () => {
       originalPortsRef.current = {
-        mixedPort: verge?.verge_mixed_port ?? clashInfo?.mixed_port ?? 7897,
-        socksPort: verge?.verge_socks_port ?? 7898,
+        mixedPort: verge?.verge_mixed_port ?? clashInfo?.mixed_port ?? 17997,
+        socksPort: verge?.verge_socks_port ?? 17998,
         socksEnabled: verge?.verge_socks_enabled ?? false,
-        httpPort: verge?.verge_port ?? 7899,
+        httpPort: verge?.verge_port ?? 17999,
         httpEnabled: verge?.verge_http_enabled ?? false,
-        redirPort: verge?.verge_redir_port ?? 7895,
+        redirPort: verge?.verge_redir_port ?? 17995,
         redirEnabled: verge?.verge_redir_enabled ?? false,
-        tproxyPort: verge?.verge_tproxy_port ?? 7896,
+        tproxyPort: verge?.verge_tproxy_port ?? 17996,
         tproxyEnabled: verge?.verge_tproxy_enabled ?? false,
       }
 
@@ -168,15 +168,15 @@ export const ClashPortViewer = forwardRef<ClashPortViewerRef>((_, ref) => {
             setTproxyEnabled(original.tproxyEnabled)
           } else {
             setMixedPort(
-              verge?.verge_mixed_port ?? clashInfo?.mixed_port ?? 7897,
+              verge?.verge_mixed_port ?? clashInfo?.mixed_port ?? 17997,
             )
-            setSocksPort(verge?.verge_socks_port ?? 7898)
+            setSocksPort(verge?.verge_socks_port ?? 17998)
             setSocksEnabled(verge?.verge_socks_enabled ?? false)
-            setHttpPort(verge?.verge_port ?? 7899)
+            setHttpPort(verge?.verge_port ?? 17999)
             setHttpEnabled(verge?.verge_http_enabled ?? false)
-            setRedirPort(verge?.verge_redir_port ?? 7895)
+            setRedirPort(verge?.verge_redir_port ?? 17995)
             setRedirEnabled(verge?.verge_redir_enabled ?? false)
-            setTproxyPort(verge?.verge_tproxy_port ?? 7896)
+            setTproxyPort(verge?.verge_tproxy_port ?? 17996)
             setTproxyEnabled(verge?.verge_tproxy_enabled ?? false)
           }
           return

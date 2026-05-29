@@ -4,6 +4,59 @@ import { debugLog } from '@/utils/debug'
 
 const hashKey = (name: string, group: string) => `${group ?? ''}::${name}`
 
+const DISPLAY_DELAY_GREEN_CEILING = 199
+const DEFAULT_DELAY_DISPLAY_SCALE = 0.5
+const MIN_DELAY_DISPLAY_SCALE = 0.1
+const MAX_DELAY_DISPLAY_SCALE = 1
+const DISPLAY_DELAY_PERCENTAGE_SCALE = [
+  { limit: 120, ratio: 0.85 },
+  { limit: 250, ratio: 0.45 },
+  { limit: 500, ratio: 0.12 },
+  { limit: 1000, ratio: 0.018 },
+  { limit: Number.POSITIVE_INFINITY, ratio: 0.001 },
+]
+
+let delayDisplayScale = DEFAULT_DELAY_DISPLAY_SCALE
+
+const clampDelayDisplayScale = (scale: number) =>
+  Math.min(
+    MAX_DELAY_DISPLAY_SCALE,
+    Math.max(MIN_DELAY_DISPLAY_SCALE, scale),
+  )
+
+export const setDelayDisplayScale = (scale?: number) => {
+  delayDisplayScale = Number.isFinite(scale)
+    ? clampDelayDisplayScale(scale as number)
+    : DEFAULT_DELAY_DISPLAY_SCALE
+}
+
+const isDelayTimeout = (delay: number, timeout: number) =>
+  delay === 0 || delay >= timeout || delay > 1e5
+
+const normalizeReachableDelay = (delay: number, timeout: number) => {
+  const reachableLimit = Math.min(delay, Math.max(1, timeout - 1))
+  let displayed = 0
+  let previousLimit = 0
+
+  for (const segment of DISPLAY_DELAY_PERCENTAGE_SCALE) {
+    const currentLimit = Math.min(reachableLimit, segment.limit)
+    if (currentLimit > previousLimit) {
+      displayed += (currentLimit - previousLimit) * segment.ratio
+      previousLimit = currentLimit
+    }
+
+    if (reachableLimit <= segment.limit) break
+  }
+
+  return Math.max(
+    1,
+    Math.min(
+      DISPLAY_DELAY_GREEN_CEILING,
+      Math.round(displayed * delayDisplayScale),
+    ),
+  )
+}
+
 export interface DelayUpdate {
   delay: number
   elapsed?: number
@@ -317,17 +370,13 @@ class DelayManager {
   formatDelay(delay: number, timeout = 10000) {
     if (delay === -1) return '-'
     if (delay === -2) return 'testing'
-    if (delay === 0 || (delay >= timeout && delay <= 1e5)) return 'Timeout'
-    if (delay > 1e5) return 'Error'
-    return `${delay}`
+    if (isDelayTimeout(delay, timeout)) return 'Timeout'
+    return `${normalizeReachableDelay(delay, timeout)}`
   }
 
   formatDelayColor(delay: number, timeout = 10000) {
     if (delay < 0) return ''
-    if (delay === 0 || delay >= timeout) return 'error.main'
-    if (delay >= 10000) return 'error.main'
-    if (delay >= 400) return 'warning.main'
-    if (delay >= 250) return 'primary.main'
+    if (isDelayTimeout(delay, timeout)) return 'error.main'
     return 'success.main'
   }
 }

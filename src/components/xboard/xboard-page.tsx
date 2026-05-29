@@ -19,8 +19,8 @@ export const XboardPage = ({
         minWidth: 0,
         height: '100%',
         overflow: 'auto',
-        p: 2,
-        bgcolor: '#eeeeee',
+        p: 2.25,
+        bgcolor: '#f3f5f4',
       }}
     >
       <Stack
@@ -28,17 +28,18 @@ export const XboardPage = ({
         spacing={2}
         sx={{
           mb: 2,
-          alignItems: 'flex-start',
+          alignItems: 'center',
           justifyContent: 'space-between',
+          minWidth: 0,
         }}
         data-tauri-drag-region="true"
       >
-        <Box data-tauri-drag-region="true">
-          <Typography variant="h5" sx={{ fontWeight: 900 }}>
+        <Box sx={{ minWidth: 0 }} data-tauri-drag-region="true">
+          <Typography variant="h5" sx={{ fontWeight: 900, lineHeight: 1.15 }}>
             {title}
           </Typography>
           {subtitle && (
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
               {subtitle}
             </Typography>
           )}

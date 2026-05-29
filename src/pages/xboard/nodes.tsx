@@ -16,7 +16,7 @@ import { useXboard } from '@/providers/xboard-context'
 const VALID_MODES = new Set(['rule', 'global', 'direct'])
 
 const NodesPage = () => {
-  const { session, refreshAccount, refreshing } = useXboard()
+  const { session, connect, refreshing } = useXboard()
   const { clashConfig } = useClashConfigData()
   const { isProxiesPending } = useProxiesData()
   const { refreshProxy } = useAppRefreshers()
@@ -30,7 +30,8 @@ const NodesPage = () => {
   const refreshNodes = useLockFn(async () => {
     setRefreshingNodes(true)
     try {
-      await Promise.all([refreshAccount(), refreshProxy()])
+      await connect()
+      await refreshProxy()
     } finally {
       setRefreshingNodes(false)
     }
@@ -63,7 +64,7 @@ const NodesPage = () => {
           disabled={refreshingNodes || refreshing || isProxiesPending}
           onClick={() => void refreshNodes()}
         >
-          刷新节点
+          刷新订阅
         </Button>
       }
     >

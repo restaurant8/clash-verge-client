@@ -394,10 +394,6 @@ const Layout = () => {
                   }}
                 >
                   <img src={brandLogo} alt="" className="brand-logo" />
-                  <div className="brand-text">
-                    <span>{remote.remoteConfig.APP_NAME}</span>
-                    <small>Native Control</small>
-                  </div>
                 </div>
                 <UpdateButton className="the-newbtn" />
               </div>

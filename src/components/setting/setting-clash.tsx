@@ -234,7 +234,7 @@ const SettingClash = ({ onError }: Props) => {
           autoComplete="new-password"
           disabled={false}
           size="small"
-          value={verge_mixed_port ?? 7897}
+          value={verge_mixed_port ?? 17997}
           sx={{ width: 100, input: { py: '7.5px', cursor: 'pointer' } }}
           onClick={(e) => {
             portRef.current?.open()

@@ -15,18 +15,23 @@ interface PanelProps {
   title?: ReactNode
   action?: ReactNode
   children: ReactNode
+  sx?: SxProps<Theme>
 }
 
-export const XboardPanel = ({ title, action, children }: PanelProps) => (
+export const XboardPanel = ({ title, action, children, sx }: PanelProps) => (
   <Paper
     elevation={0}
-    sx={{
-      p: 2,
-      border: '1px solid',
-      borderColor: 'divider',
-      borderRadius: 1.5,
-      bgcolor: '#fff',
-    }}
+    sx={[
+      {
+        p: 2,
+        border: '1px solid',
+        borderColor: '#dfe5e2',
+        borderRadius: 1,
+        bgcolor: '#fff',
+        boxShadow: '0 1px 2px rgba(15, 23, 42, 0.03)',
+      },
+      ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
+    ]}
   >
     {(title || action) && (
       <Stack
@@ -36,9 +41,10 @@ export const XboardPanel = ({ title, action, children }: PanelProps) => (
           mb: 1.5,
           alignItems: 'center',
           justifyContent: 'space-between',
+          minWidth: 0,
         }}
       >
-        <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+        <Typography variant="subtitle1" sx={{ minWidth: 0, fontWeight: 800 }}>
           {title}
         </Typography>
         {action}
@@ -52,23 +58,29 @@ export const XboardMetric = ({
   label,
   value,
   helper,
+  sx,
   valueSx,
 }: {
   label: ReactNode
   value: ReactNode
   helper?: ReactNode
+  sx?: SxProps<Theme>
   valueSx?: SxProps<Theme>
 }) => (
   <Box
-    sx={{
-      minWidth: 0,
-      minHeight: 82,
-      p: 1.5,
-      borderRadius: 1.5,
-      bgcolor: '#fff',
-      border: '1px solid',
-      borderColor: 'divider',
-    }}
+    sx={[
+      {
+        minWidth: 0,
+        minHeight: 86,
+        p: 1.5,
+        borderRadius: 1,
+        bgcolor: '#fff',
+        border: '1px solid',
+        borderColor: '#dfe5e2',
+        boxShadow: '0 1px 2px rgba(15, 23, 42, 0.03)',
+      },
+      ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
+    ]}
   >
     <Typography variant="caption" color="text.secondary">
       {label}
@@ -124,8 +136,8 @@ export const XboardEmpty = ({
       textAlign: 'center',
       p: 3,
       border: '1px dashed',
-      borderColor: 'divider',
-      borderRadius: 1.5,
+      borderColor: '#d8e0dc',
+      borderRadius: 1,
       bgcolor: '#fff',
     }}
   >
@@ -159,7 +171,7 @@ export const XboardTrafficBar = ({
         variant="determinate"
         value={percent}
         color={color}
-        sx={{ height: 8, borderRadius: 999 }}
+        sx={{ height: 8, borderRadius: 1 }}
       />
       <Typography variant="caption" color="text.secondary">
         已使用 {percent.toFixed(1)}%
@@ -175,7 +187,7 @@ export const XboardActionButton = ({
   <Button
     variant="contained"
     disableElevation
-    sx={{ borderRadius: 1, fontWeight: 800 }}
+    sx={{ borderRadius: 1, fontWeight: 800, minHeight: 42 }}
     {...props}
   >
     {children}

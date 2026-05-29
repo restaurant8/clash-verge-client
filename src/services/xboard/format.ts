@@ -37,8 +37,15 @@ export const orderStatusText = (status: unknown) => {
     '2': '已取消',
     '3': '已完成',
     '4': '已折抵',
+    paid: '支付成功',
+    success: '支付成功',
+    completed: '支付成功',
+    pending: '待支付',
+    unpaid: '待支付',
+    canceled: '已取消',
+    cancelled: '已取消',
   }
-  return map[String(status)] ?? `状态 ${String(status ?? '-')}`
+  return map[String(status).toLowerCase()] ?? `状态 ${String(status ?? '-')}`
 }
 
 export const firstDefined = (...values: unknown[]) =>

@@ -77,7 +77,7 @@ impl IProfiles {
     }
 
     pub async fn save_file(&self) -> Result<()> {
-        help::save_yaml(&dirs::profiles_path()?, self, Some("# Profiles Config for Clash Verge")).await
+        help::save_yaml(&dirs::profiles_path()?, self, Some("# Profiles Config for MuaCloud")).await
     }
 
     /// 只修改current，valid和chain
@@ -528,9 +528,18 @@ impl IProfiles {
 // 特殊的Send-safe helper函数，完全避免跨await持有guard
 use crate::config::Config;
 
-pub async fn profiles_append_item_with_filedata_safe(item: &PrfItem, file_data: Option<String>) -> Result<()> {
+pub async fn profiles_append_item_with_filedata_safe(
+    item: &PrfItem,
+    file_data: Option<String>,
+) -> Result<std::string::String> {
     let item = &mut PrfItem::from(item, file_data).await?;
-    profiles_append_item_safe(item).await
+    let uid = item
+        .uid
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("profile uid should not be null"))?
+        .to_string();
+    profiles_append_item_safe(item).await?;
+    Ok(uid)
 }
 
 pub async fn profiles_append_item_safe(item: &mut PrfItem) -> Result<()> {

@@ -17,10 +17,23 @@ export interface XboardRemoteConfig extends XboardRecord {
   crisp_id: string
   imgbb_api_key: string
   discount_delay_seconds: number
+  delay_display_scale: number
   version: string
   update_notes: string
   force_update: boolean
   latest_client_url: string
+  windows_version: string
+  windows_download_url: string
+  windows_update_notes: string
+  windows_force_update: boolean
+  macos_version: string
+  macos_download_url: string
+  macos_update_notes: string
+  macos_force_update: boolean
+  android_version: string
+  android_download_url: string
+  android_update_notes: string
+  android_force_update: boolean
 }
 
 export interface XboardBootstrapData extends XboardRecord {

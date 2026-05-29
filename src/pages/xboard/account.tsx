@@ -20,7 +20,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useLockFn } from 'ahooks'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { XboardPage } from '@/components/xboard/xboard-page'
 import {
@@ -91,22 +91,24 @@ const AccountPage = () => {
     Partial<Record<'remind_expire' | 'remind_traffic', boolean>>
   >({})
 
-  const loadAccountExtras = useLockFn(async () => {
-    if (!session) return
-    setLoadingExtras(true)
-    try {
-      const [commPayload, invitePayload, botPayload] = await Promise.all([
-        client.userCommConfig(session.authData).catch(() => ({})),
-        client.inviteInfo(session.authData).catch(() => ({})),
-        client.telegramBotInfo(session.authData).catch(() => ({})),
-      ])
-      setCommConfig(asRecord(commPayload))
-      setInviteInfo(asRecord(invitePayload))
-      setTelegramBot(asRecord(botPayload))
-    } finally {
-      setLoadingExtras(false)
-    }
-  })
+  const loadAccountExtras = useLockFn(
+    useCallback(async () => {
+      if (!session) return
+      setLoadingExtras(true)
+      try {
+        const [commPayload, invitePayload, botPayload] = await Promise.all([
+          client.userCommConfig(session.authData).catch(() => ({})),
+          client.inviteInfo(session.authData).catch(() => ({})),
+          client.telegramBotInfo(session.authData).catch(() => ({})),
+        ])
+        setCommConfig(asRecord(commPayload))
+        setInviteInfo(asRecord(invitePayload))
+        setTelegramBot(asRecord(botPayload))
+      } finally {
+        setLoadingExtras(false)
+      }
+    }, [client, session]),
+  )
 
   useEffect(() => {
     void loadAccountExtras()
@@ -300,13 +302,8 @@ const AccountPage = () => {
           </Grid>
           <Grid size={{ xs: 12, sm: 6, md: 4 }}>
             <XboardMetric
-              label="返利（转换）"
+              label="返利"
               value={formatAccountMoney(commissionBalance, currency)}
-              helper={
-                inviteStat[3] !== undefined
-                  ? `比例 ${numberValue(inviteStat[3])}%`
-                  : undefined
-              }
             />
           </Grid>
         </Grid>

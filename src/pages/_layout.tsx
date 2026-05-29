@@ -57,12 +57,22 @@ type NavItem = (typeof navItems)[number]
 
 type MenuContextPosition = { top: number; left: number }
 
+const SETTINGS_ENTRY_PATHS = new Set(['/settings', '/advanced'])
+const SETTINGS_UNLOCK_STORAGE_KEY = 'muacloud:settings-menu-unlocked'
+const SETTINGS_UNLOCK_CLICK_COUNT = 5
+const SETTINGS_UNLOCK_CLICK_WINDOW_MS = 2000
+
 interface SortableNavMenuItemProps {
   item: NavItem
   label: string
+  onActivate?: () => string | void
 }
 
-const SortableNavMenuItem = ({ item, label }: SortableNavMenuItemProps) => {
+const SortableNavMenuItem = ({
+  item,
+  label,
+  onActivate,
+}: SortableNavMenuItemProps) => {
   const {
     attributes,
     listeners,
@@ -87,6 +97,7 @@ const SortableNavMenuItem = ({ item, label }: SortableNavMenuItemProps) => {
     <LayoutItem
       to={item.path}
       icon={item.icon}
+      onActivate={onActivate}
       sortable={{
         setNodeRef,
         attributes,
@@ -129,9 +140,14 @@ const Layout = () => {
   const [menuUnlocked, setMenuUnlocked] = useState(false)
   const [menuContextPosition, setMenuContextPosition] =
     useState<MenuContextPosition | null>(null)
+  const [settingsMenuUnlocked, setSettingsMenuUnlocked] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.sessionStorage.getItem(SETTINGS_UNLOCK_STORAGE_KEY) === '1'
+  })
 
   const windowControlsRef = useRef<any>(null)
   const lastWindowModeRef = useRef<'auth' | 'app' | null>(null)
+  const accountMenuClickRef = useRef({ count: 0, lastAt: 0 })
   const { currentWindow } = useWindow()
   const { decorated, refreshDecorated } = useWindowDecorations()
 
@@ -167,6 +183,9 @@ const Layout = () => {
       ![false, 0, '0', 'false'].includes(features[key])
 
     return navItems.filter((item) => {
+      if (SETTINGS_ENTRY_PATHS.has(item.path)) {
+        return settingsMenuUnlocked
+      }
       if (item.path === '/tickets') {
         return isFeatureEnabled('enable_ticket_system')
       }
@@ -175,7 +194,7 @@ const Layout = () => {
       }
       return true
     })
-  }, [appConfig?.features, remote.bootstrap?.features])
+  }, [appConfig?.features, remote.bootstrap?.features, settingsMenuUnlocked])
 
   const {
     menuOrder,
@@ -223,6 +242,32 @@ const Layout = () => {
     setMenuContextPosition(null)
     void patchVerge({ collapse_navbar: !navCollapsed })
   }, [navCollapsed, patchVerge])
+
+  const handleNavItemActivate = useCallback((item: NavItem) => {
+    if (settingsMenuUnlocked) return undefined
+
+    if (item.path !== '/account') {
+      accountMenuClickRef.current = { count: 0, lastAt: 0 }
+      return undefined
+    }
+
+    const now = Date.now()
+    const isContinuous =
+      now - accountMenuClickRef.current.lastAt <=
+      SETTINGS_UNLOCK_CLICK_WINDOW_MS
+    const count = isContinuous ? accountMenuClickRef.current.count + 1 : 1
+
+    accountMenuClickRef.current = { count, lastAt: now }
+
+    if (count >= SETTINGS_UNLOCK_CLICK_COUNT) {
+      accountMenuClickRef.current = { count: 0, lastAt: 0 }
+      setSettingsMenuUnlocked(true)
+      window.sessionStorage.setItem(SETTINGS_UNLOCK_STORAGE_KEY, '1')
+      return '/settings'
+    }
+
+    return undefined
+  }, [settingsMenuUnlocked])
 
   const customTitlebar = useMemo(
     () =>
@@ -299,6 +344,16 @@ const Layout = () => {
       navigate('/', { replace: true })
     }
   }, [booting, navigate, pathname, session])
+
+  useEffect(() => {
+    if (
+      shouldShowAppShell &&
+      !settingsMenuUnlocked &&
+      SETTINGS_ENTRY_PATHS.has(pathname)
+    ) {
+      navigate('/account', { replace: true })
+    }
+  }, [navigate, pathname, settingsMenuUnlocked, shouldShowAppShell])
 
   useEffect(() => {
     if (language) {
@@ -442,6 +497,7 @@ const Layout = () => {
                             key={item.path}
                             item={item}
                             label={resolveNavLabel(item.label)}
+                            onActivate={() => handleNavItemActivate(item)}
                           />
                         )
                       })}
@@ -463,6 +519,7 @@ const Layout = () => {
                         key={item.path}
                         to={item.path}
                         icon={item.icon}
+                        onActivate={() => handleNavItemActivate(item)}
                       >
                         {resolveNavLabel(item.label)}
                       </LayoutItem>

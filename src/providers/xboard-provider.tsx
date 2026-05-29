@@ -23,6 +23,7 @@ import type {
   XboardConnectionState,
   XboardRecord,
   XboardResourceCache,
+  XboardRemoteConfig,
   XboardResolvedConfig,
   XboardSession,
 } from '@/services/xboard/types'
@@ -66,6 +67,7 @@ const buildClient = (remote: XboardResolvedConfig) =>
   new XboardApiClient(
     remote.activeApiDomain,
     remote.remoteConfig.custom_ua || 'muacloud/1.0',
+    remote.apiDomains,
   )
 
 const loadAccountSnapshot = async (
@@ -106,6 +108,27 @@ const loadAccountSnapshot = async (
     appConfig,
     notices: asArray(noticePayload),
   }
+}
+
+const loadSubscriptionProfile = async (
+  client: XboardApiClient,
+  remoteConfig: XboardRemoteConfig,
+  snapshot: XboardAccountSnapshot,
+) => {
+  if (!snapshot.session.subscribeToken) {
+    throw new Error('当前账号没有订阅 token')
+  }
+
+  if (!snapshot.servers.length) {
+    throw new Error('当前账号没有可用节点，请先购买套餐或联系客服')
+  }
+
+  return ensureXboardSubscriptionProfile(
+    client,
+    snapshot.session.subscribeToken,
+    remoteConfig,
+    snapshot.subscribeInfo,
+  )
 }
 
 export const XboardProvider = ({ children }: { children: ReactNode }) => {
@@ -156,6 +179,31 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
     setNotices(snapshot.notices)
   }, [])
 
+  const syncSubscriptionProfile = useCallback(
+    async (
+      snapshot: XboardAccountSnapshot,
+      options: { noticeErrors?: boolean } = {},
+    ) => {
+      try {
+        const uid = await loadSubscriptionProfile(
+          client,
+          remote.remoteConfig,
+          snapshot,
+        )
+        setLastError(undefined)
+        return uid
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        setLastError(message)
+        if (options.noticeErrors) {
+          showNotice.error(`订阅自动加载失败：${message}`)
+        }
+        return undefined
+      }
+    },
+    [client, remote.remoteConfig],
+  )
+
   const logout = useCallback(() => {
     clearXboardSession()
     setSession(null)
@@ -175,6 +223,7 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
     try {
       const snapshot = await loadAccountSnapshot(client, session)
       applySnapshot(snapshot)
+      await syncSubscriptionProfile(snapshot, { noticeErrors: true })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       setLastError(message)
@@ -183,7 +232,7 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setRefreshing(false)
     }
-  }, [applySnapshot, client, logout, session])
+  }, [applySnapshot, client, logout, session, syncSubscriptionProfile])
 
   const loadPlans = useCallback(
     async (force = false) => {
@@ -302,7 +351,10 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
         const snapshot = await loadAccountSnapshot(client, nextSession)
         clearResourceCache()
         applySnapshot(snapshot)
-        showNotice.success('登录成功')
+        const synced = await syncSubscriptionProfile(snapshot, {
+          noticeErrors: true,
+        })
+        showNotice.success(synced ? '登录成功，订阅已加载' : '登录成功')
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         setLastError(message)
@@ -312,7 +364,7 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
         setRefreshing(false)
       }
     },
-    [applySnapshot, clearResourceCache, client],
+    [applySnapshot, clearResourceCache, client, syncSubscriptionProfile],
   )
 
   const register = useCallback(
@@ -338,7 +390,10 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
         const snapshot = await loadAccountSnapshot(client, nextSession)
         clearResourceCache()
         applySnapshot(snapshot)
-        showNotice.success('注册成功')
+        const synced = await syncSubscriptionProfile(snapshot, {
+          noticeErrors: true,
+        })
+        showNotice.success(synced ? '注册成功，订阅已加载' : '注册成功')
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         setLastError(message)
@@ -348,7 +403,7 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
         setRefreshing(false)
       }
     },
-    [applySnapshot, clearResourceCache, client],
+    [applySnapshot, clearResourceCache, client, syncSubscriptionProfile],
   )
 
   const connect = useCallback(async () => {
@@ -370,12 +425,7 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
         throw new Error('当前账号没有可用节点，请先购买套餐或联系客服')
       }
 
-      await ensureXboardSubscriptionProfile(
-        client,
-        snapshot.session.subscribeToken,
-        remote.remoteConfig,
-        snapshot.subscribeInfo,
-      )
+      await loadSubscriptionProfile(client, remote.remoteConfig, snapshot)
       await restartCoreForXboard()
 
       setConnection({
@@ -410,11 +460,21 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
         if (cancelled) return
         const storedSession = readXboardSession()
         if (storedSession) {
-          const snapshot = await loadAccountSnapshot(
-            buildClient(nextRemote),
-            storedSession,
-          )
+          const bootstrapClient = buildClient(nextRemote)
+          const snapshot = await loadAccountSnapshot(bootstrapClient, storedSession)
           if (!cancelled) applySnapshot(snapshot)
+          try {
+            await loadSubscriptionProfile(
+              bootstrapClient,
+              nextRemote.remoteConfig,
+              snapshot,
+            )
+            if (!cancelled) setLastError(undefined)
+          } catch (syncError) {
+            const message =
+              syncError instanceof Error ? syncError.message : String(syncError)
+            if (!cancelled) setLastError(message)
+          }
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)

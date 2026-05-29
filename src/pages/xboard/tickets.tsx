@@ -8,8 +8,10 @@ import {
 } from '@mui/icons-material'
 import {
   Alert,
+  alpha,
   Box,
   Button,
+  Chip,
   CircularProgress,
   Divider,
   Grid,
@@ -17,6 +19,7 @@ import {
   MenuItem,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material'
 import { useLockFn } from 'ahooks'
@@ -47,11 +50,22 @@ const statusText = (status: unknown) => {
   return map[String(status ?? '0')] ?? '处理中'
 }
 
+const statusColor = (status: unknown): 'success' | 'default' =>
+  String(status ?? '0') === '1' ? 'default' : 'success'
+
 const normalizeUrl = (value: unknown) => {
   const text = String(value ?? '').trim()
   if (!text) return ''
   return /^https?:\/\//i.test(text) ? text : `https://${text}`
 }
+
+const ticketTitle = (ticket: any, index: number) =>
+  String(ticket?.subject ?? ticket?.title ?? `工单 ${index + 1}`)
+
+const ticketDate = (value: unknown) => (value ? formatDateTime(value) : '-')
+
+const messageText = (item: any) =>
+  String(item?.message ?? item?.content ?? item?.text ?? JSON.stringify(item))
 
 const TicketsPage = () => {
   const {
@@ -120,6 +134,9 @@ const TicketsPage = () => {
     () => tickets.find((ticket) => String(getId(ticket)) === selectedId),
     [selectedId, tickets],
   )
+
+  const selectedStatus = selectedTicket?.status ?? detail?.status
+  const selectedClosed = String(selectedStatus ?? '0') === '1'
 
   const createTicket = useLockFn(async () => {
     if (!session) return
@@ -231,8 +248,9 @@ const TicketsPage = () => {
   return (
     <XboardPage
       title="工单"
+      subtitle="提交问题、查看进度，并与客服持续沟通。"
       action={
-        <Stack direction="row" spacing={1}>
+        <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
           <Button
             variant="outlined"
             startIcon={
@@ -245,7 +263,7 @@ const TicketsPage = () => {
             disabled={openingOfficial || !fallbackOfficialUrl}
             onClick={() => void openOfficialWebsite()}
           >
-            官网网站
+            官方网站
           </Button>
           {hasCrisp && (
             <Button
@@ -257,214 +275,344 @@ const TicketsPage = () => {
               在线客服
             </Button>
           )}
-          <Button
-            variant="outlined"
-            startIcon={
-              refreshingTickets ? (
-                <CircularProgress color="inherit" size={16} />
-              ) : (
-                <RefreshRounded />
-              )
-            }
-            disabled={refreshingTickets}
-            onClick={() => void refreshTickets()}
-          >
-            刷新
-          </Button>
         </Stack>
       }
     >
-      <Stack spacing={2}>
+      <Stack spacing={2} sx={{ minHeight: 0 }}>
         {feedback && <Alert severity={feedbackType}>{feedback}</Alert>}
 
-        <XboardPanel title="新建工单">
-          <Grid container spacing={1.5} sx={{ alignItems: 'center' }}>
-            <Grid size={{ xs: 12, md: 3 }}>
-              <TextField
-                label="主题"
-                value={subject}
-                onChange={(event) => setSubject(event.target.value)}
-                fullWidth
-              />
-            </Grid>
-            <Grid size={{ xs: 12, md: 5 }}>
-              <TextField
-                label="消息"
-                value={message}
-                onChange={(event) => setMessage(event.target.value)}
-                fullWidth
-              />
-            </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
-              <TextField
-                select
-                label="工单等级"
-                value={level}
-                onChange={(event) => setLevel(event.target.value)}
-                fullWidth
+        <Grid container spacing={2} sx={{ alignItems: 'stretch' }}>
+          <Grid size={{ xs: 12, lg: 4 }}>
+            <Stack spacing={2} sx={{ height: '100%' }}>
+              <XboardPanel
+                title="新建工单"
+                action={<Chip size="small" label={levelText(level)} />}
               >
-                <MenuItem value="0">低</MenuItem>
-                <MenuItem value="1">普通</MenuItem>
-                <MenuItem value="2">高</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid size={{ xs: 12, md: 1 }}>
-              <IconButton
-                color="primary"
-                disabled={creating || !subject.trim() || !message.trim()}
-                onClick={() => void createTicket()}
-                sx={{
-                  width: { xs: '100%', md: 48 },
-                  height: 48,
-                  borderRadius: 1,
-                  bgcolor: 'primary.main',
-                  color: 'primary.contrastText',
-                  '&:hover': { bgcolor: 'primary.dark' },
-                  '&.Mui-disabled': {
-                    bgcolor: 'action.disabledBackground',
-                    color: 'action.disabled',
-                  },
-                }}
-              >
-                {creating ? (
-                  <CircularProgress color="inherit" size={18} />
-                ) : (
-                  <AddCommentRounded />
-                )}
-              </IconButton>
-            </Grid>
-          </Grid>
-        </XboardPanel>
-
-        <XboardPanel title="工单">
-          {tickets.length ? (
-            <Stack spacing={1}>
-              {tickets.map((ticket, index) => {
-                const id = String(getId(ticket) ?? index)
-                const selected = selectedId === id
-                return (
-                  <Box
-                    key={id}
-                    onClick={() => setSelectedIdOverride(id)}
-                    sx={{
-                      p: 1.5,
-                      borderRadius: 1.5,
-                      border: '1px solid',
-                      borderColor: selected ? 'primary.main' : 'divider',
-                      bgcolor: '#fff',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <Stack
-                      direction={{ xs: 'column', sm: 'row' }}
-                      spacing={1}
-                      sx={{
-                        alignItems: { xs: 'flex-start', sm: 'center' },
-                        justifyContent: 'space-between',
-                      }}
-                    >
-                      <Box sx={{ minWidth: 0 }}>
-                        <Typography noWrap sx={{ fontWeight: 800 }}>
-                          {ticket.subject ?? `工单 ${index + 1}`}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {formatDateTime(ticket.created_at)}
-                        </Typography>
-                      </Box>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ flex: '0 0 auto' }}
+                <Stack spacing={1.5}>
+                  <Grid container spacing={1.5}>
+                    <Grid size={{ xs: 12, sm: 7, lg: 12, xl: 7 }}>
+                      <TextField
+                        label="主题"
+                        value={subject}
+                        onChange={(event) => setSubject(event.target.value)}
+                        fullWidth
+                      />
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 5, lg: 12, xl: 5 }}>
+                      <TextField
+                        select
+                        label="工单等级"
+                        value={level}
+                        onChange={(event) => setLevel(event.target.value)}
+                        fullWidth
                       >
-                        {levelText(ticket.level)} · {statusText(ticket.status)}
-                      </Typography>
-                    </Stack>
-                  </Box>
-                )
-              })}
-            </Stack>
-          ) : (
-            <Typography color="text.secondary">暂无工单</Typography>
-          )}
-        </XboardPanel>
-
-        {selectedId && (
-          <XboardPanel
-            title={selectedTicket?.subject ?? '工单详情'}
-            action={
-              <Button
-                color="error"
-                startIcon={
-                  closing ? (
-                    <CircularProgress color="inherit" size={16} />
-                  ) : (
-                    <CloseRounded />
-                  )
-                }
-                disabled={closing}
-                onClick={() => void closeTicket()}
-              >
-                关闭
-              </Button>
-            }
-          >
-            <Stack spacing={1.2}>
-              {messages.length ? (
-                messages.map((item, index) => (
-                  <Box
-                    key={item.id ?? index}
-                    sx={{
-                      p: 1.25,
-                      borderRadius: 1.5,
-                      bgcolor: '#fff',
-                      border: '1px solid',
-                      borderColor: 'divider',
-                    }}
-                  >
-                    <Typography variant="caption" color="text.secondary">
-                      {item.is_admin ? '客服' : '用户'} ·{' '}
-                      {formatDateTime(item.created_at)}
-                    </Typography>
-                    <Typography sx={{ whiteSpace: 'pre-wrap' }}>
-                      {item.message ?? item.content ?? JSON.stringify(item)}
-                    </Typography>
-                  </Box>
-                ))
-              ) : (
-                <Typography color="text.secondary">暂无对话内容</Typography>
-              )}
-              <Divider />
-              <Grid container spacing={1.5} sx={{ alignItems: 'center' }}>
-                <Grid size={{ xs: 12, md: 10 }}>
+                        <MenuItem value="0">低</MenuItem>
+                        <MenuItem value="1">普通</MenuItem>
+                        <MenuItem value="2">高</MenuItem>
+                      </TextField>
+                    </Grid>
+                  </Grid>
                   <TextField
-                    label="回复"
-                    value={reply}
-                    onChange={(event) => setReply(event.target.value)}
+                    label="消息"
+                    value={message}
+                    onChange={(event) => setMessage(event.target.value)}
                     fullWidth
+                    multiline
+                    minRows={4}
                   />
-                </Grid>
-                <Grid size={{ xs: 12, md: 2 }}>
                   <Button
                     variant="contained"
                     disableElevation
                     fullWidth
                     startIcon={
-                      replying ? (
+                      creating ? (
                         <CircularProgress color="inherit" size={16} />
                       ) : (
-                        <SendRounded />
+                        <AddCommentRounded />
                       )
                     }
-                    disabled={replying || !reply.trim()}
-                    onClick={() => void replyTicket()}
+                    disabled={creating || !subject.trim() || !message.trim()}
+                    onClick={() => void createTicket()}
+                    sx={{ minHeight: 42, fontWeight: 800 }}
                   >
-                    回复
+                    提交工单
                   </Button>
-                </Grid>
-              </Grid>
+                </Stack>
+              </XboardPanel>
+
+              <XboardPanel
+                title="我的工单"
+                action={
+                  <Tooltip title="刷新工单">
+                    <span>
+                      <IconButton
+                        size="small"
+                        disabled={refreshingTickets}
+                        onClick={() => void refreshTickets()}
+                      >
+                        {refreshingTickets ? (
+                          <CircularProgress color="inherit" size={18} />
+                        ) : (
+                          <RefreshRounded fontSize="small" />
+                        )}
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                }
+                sx={{
+                  flex: 1,
+                  minHeight: 260,
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
+                {tickets.length ? (
+                  <Stack
+                    spacing={1}
+                    sx={{
+                      flex: 1,
+                      minHeight: 0,
+                      maxHeight: { xs: 320, lg: 430 },
+                      overflow: 'auto',
+                      pr: 0.5,
+                    }}
+                  >
+                    {tickets.map((ticket, index) => {
+                      const id = String(getId(ticket) ?? index)
+                      const selected = selectedId === id
+                      return (
+                        <Box
+                          key={id}
+                          onClick={() => setSelectedIdOverride(id)}
+                          sx={(theme) => ({
+                            p: 1.5,
+                            borderRadius: 1,
+                            border: '1px solid',
+                            borderColor: selected
+                              ? theme.palette.primary.main
+                              : theme.palette.divider,
+                            bgcolor: selected
+                              ? alpha(theme.palette.primary.main, 0.07)
+                              : '#fff',
+                            cursor: 'pointer',
+                            transition:
+                              'border-color .16s ease, background-color .16s ease',
+                            '&:hover': {
+                              borderColor: theme.palette.primary.main,
+                              bgcolor: alpha(theme.palette.primary.main, 0.04),
+                            },
+                          })}
+                        >
+                          <Stack spacing={1}>
+                            <Stack
+                              direction="row"
+                              spacing={1}
+                              sx={{
+                                alignItems: 'flex-start',
+                                justifyContent: 'space-between',
+                                minWidth: 0,
+                              }}
+                            >
+                              <Box sx={{ minWidth: 0 }}>
+                                <Typography noWrap sx={{ fontWeight: 800 }}>
+                                  {ticketTitle(ticket, index)}
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                >
+                                  {ticketDate(ticket.created_at)}
+                                </Typography>
+                              </Box>
+                              <Chip
+                                size="small"
+                                color={statusColor(ticket.status)}
+                                label={statusText(ticket.status)}
+                                sx={{ flex: '0 0 auto', fontWeight: 700 }}
+                              />
+                            </Stack>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ display: 'block' }}
+                            >
+                              优先级：{levelText(ticket.level)}
+                            </Typography>
+                          </Stack>
+                        </Box>
+                      )
+                    })}
+                  </Stack>
+                ) : (
+                  <XboardEmpty
+                    title="暂无工单"
+                    description="创建工单后会在这里显示处理进度。"
+                  />
+                )}
+              </XboardPanel>
             </Stack>
-          </XboardPanel>
-        )}
+          </Grid>
+
+          <Grid size={{ xs: 12, lg: 8 }}>
+            {selectedId ? (
+              <XboardPanel
+                title={selectedTicket?.subject ?? '工单详情'}
+                action={
+                  <Button
+                    color="error"
+                    startIcon={
+                      closing ? (
+                        <CircularProgress color="inherit" size={16} />
+                      ) : (
+                        <CloseRounded />
+                      )
+                    }
+                    disabled={closing || selectedClosed}
+                    onClick={() => void closeTicket()}
+                  >
+                    关闭
+                  </Button>
+                }
+                sx={{
+                  height: '100%',
+                  minHeight: 540,
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
+                <Stack spacing={1.5} sx={{ flex: 1, minHeight: 0 }}>
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <Typography variant="body2" color="text.secondary">
+                      工单 #{selectedId}
+                    </Typography>
+                    <Stack direction="row" spacing={1}>
+                      <Chip
+                        size="small"
+                        label={levelText(selectedTicket?.level ?? detail?.level)}
+                        variant="outlined"
+                      />
+                      <Chip
+                        size="small"
+                        color={statusColor(selectedStatus)}
+                        label={statusText(selectedStatus)}
+                        sx={{ fontWeight: 700 }}
+                      />
+                    </Stack>
+                  </Stack>
+
+                  <Divider />
+
+                  <Stack
+                    spacing={1.2}
+                    sx={{
+                      flex: 1,
+                      minHeight: 0,
+                      overflow: 'auto',
+                      pr: 0.5,
+                    }}
+                  >
+                    {messages.length ? (
+                      messages.map((item, index) => {
+                        const fromAdmin = Boolean(item.is_admin)
+                        return (
+                          <Box
+                            key={item.id ?? index}
+                            sx={(theme) => ({
+                              alignSelf: fromAdmin ? 'flex-start' : 'flex-end',
+                              width: { xs: '100%', md: '82%' },
+                              p: 1.5,
+                              borderRadius: 1,
+                              bgcolor: fromAdmin
+                                ? '#fff'
+                                : alpha(theme.palette.primary.main, 0.08),
+                              border: '1px solid',
+                              borderColor: fromAdmin
+                                ? theme.palette.divider
+                                : alpha(theme.palette.primary.main, 0.24),
+                            })}
+                          >
+                            <Stack spacing={0.5}>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                {fromAdmin ? '客服' : '用户'} ·{' '}
+                                {ticketDate(item.created_at)}
+                              </Typography>
+                              <Typography sx={{ whiteSpace: 'pre-wrap' }}>
+                                {messageText(item)}
+                              </Typography>
+                            </Stack>
+                          </Box>
+                        )
+                      })
+                    ) : (
+                      <XboardEmpty
+                        title="暂无对话内容"
+                        description="选择工单后会显示详细沟通记录。"
+                      />
+                    )}
+                  </Stack>
+
+                  <Divider />
+
+                  <Stack
+                    direction={{ xs: 'column', sm: 'row' }}
+                    spacing={1.2}
+                    sx={{ alignItems: 'stretch' }}
+                  >
+                    <TextField
+                      label={selectedClosed ? '工单已关闭' : '回复'}
+                      value={reply}
+                      onChange={(event) => setReply(event.target.value)}
+                      fullWidth
+                      multiline
+                      minRows={2}
+                      disabled={selectedClosed}
+                    />
+                    <Button
+                      variant="contained"
+                      disableElevation
+                      startIcon={
+                        replying ? (
+                          <CircularProgress color="inherit" size={16} />
+                        ) : (
+                          <SendRounded />
+                        )
+                      }
+                      disabled={replying || selectedClosed || !reply.trim()}
+                      onClick={() => void replyTicket()}
+                      sx={{
+                        minWidth: { xs: '100%', sm: 116 },
+                        fontWeight: 800,
+                      }}
+                    >
+                      回复
+                    </Button>
+                  </Stack>
+                </Stack>
+              </XboardPanel>
+            ) : (
+              <XboardPanel
+                title="工单详情"
+                sx={{ height: '100%', minHeight: 540 }}
+              >
+                <XboardEmpty
+                  title="请选择工单"
+                  description="左侧选择一条工单后查看对话和处理状态。"
+                />
+              </XboardPanel>
+            )}
+          </Grid>
+        </Grid>
       </Stack>
     </XboardPage>
   )

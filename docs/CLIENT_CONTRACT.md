@@ -98,8 +98,10 @@ GET /api/v1/client/subscribe?token={subscribe_token}&flag=clashmeta
 3. 如果存在 `subscribe_token`，请求 `/api/v2/client/app/getConfig?token={subscribe_token}`。
 4. 如果本地存在 `auth_data`，请求 `/api/v1/user/checkLogin`。
 5. 如果登录有效，请求 `/api/v1/user/info`、`/api/v1/user/getSubscribe`、`/api/v1/user/server/fetch`。
-6. 如果登录失效，清理本地登录态，只保留未登录首页和登录入口。
-7. 如果后端配置哈希 `config_hash` 变化，刷新 UI 配置、功能开关和业务规则缓存。
+6. 如果登录有效且存在 `subscribe_token` 与可用节点，客户端每次启动都必须请求 `/api/v1/client/subscribe?token={subscribe_token}&flag=clashmeta` 拉取最新 mihomo 配置，写入并切换到客户端自动生成的 Xboard profile。
+7. 最新订阅 profile 写入并通过本地配置校验后，客户端必须清理旧的自动生成 Xboard profile；用户手动创建的本地/远程 profile 不得被自动删除。
+8. 如果登录失效，清理本地登录态，只保留未登录首页和登录入口。
+9. 如果后端配置哈希 `config_hash` 变化，刷新 UI 配置、功能开关和业务规则缓存。
 
 `/api/v2/client/app/getConfig` 当前走 `client` middleware。实测无 `token` 时返回 403：
 
@@ -235,6 +237,7 @@ GET /api/v1/client/subscribe?token={subscribe_token}&flag=clashmeta
 后端参与点：
 
 - 配置来源必须是 `/api/v1/client/subscribe?token={token}&flag=clashmeta`。
+- 登录、注册、账号刷新和冷启动恢复登录态后，客户端都必须重新拉取订阅并载入当前 Xboard profile，成功载入新配置后再删除旧的自动生成 Xboard profile。
 - App 默认核心、自动切换、测速开关、UI 开关可从 `/api/v2/client/app/getConfig` 读取。
 - 如果用户订阅无效或节点为空，客户端必须停止连接或禁止启动。
 - 不要把 `/api/v1/client/app/getConfig` 作为权益校验依据。实测该接口在无有效套餐时仍可能返回基础 YAML 配置，但 `/api/v1/client/subscribe` 会返回 403。
@@ -263,6 +266,27 @@ GET /api/v1/client/subscribe?token={subscribe_token}&flag=clashmeta
   "coupon_code": "OPTIONAL"
 }
 ```
+
+余额抵扣沿用 Xboard 默认行为：客户端不传余额开关，后台在 `order/save` 阶段按站点规则自动使用用户可用余额抵扣。客户端必须在下单设置中提示用户“账户余额会自动抵扣，最终应付以订单详情为准”。
+
+创建订单时后端按以下顺序计算：
+
+1. 优惠码抵扣。
+2. 用户专属折扣。
+3. 更换套餐时的套餐折抵，取决于后台 `surplus_enable` 和套餐更换开关。
+4. 用户余额自动抵扣。
+
+因此客户端只负责传递合法的 `plan_id`、`period`、`coupon_code`。创建订单成功拿到 `trade_no` 后，必须优先读取 `/api/v1/user/order/detail?trade_no={trade_no}`，用订单详情里的后端金额字段展示最终结果：
+
+| 字段 | 含义 |
+|---|---|
+| `discount_amount` | 优惠码和用户专属折扣产生的抵扣金额 |
+| `surplus_amount` | 后台套餐折抵金额 |
+| `balance_amount` | 后台实际使用的用户余额 |
+| `refund_amount` | 套餐折抵超过新订单金额时返还到余额的金额 |
+| `total_amount` | 折扣、套餐折抵和余额抵扣后的剩余应付金额 |
+
+如果 `total_amount <= 0`，客户端仍然调用 `/order/checkout` 让后端完成免费订单开通流程；此时 `method` 可以省略。客户端不能用本地估算结果直接判定订单完成，仍必须以 `/order/check` 返回状态 `3` 为准。
 
 合法 `period`：
 

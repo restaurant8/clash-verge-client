@@ -10,6 +10,7 @@ interface RequestOptions {
   subscribeToken?: string
   rawText?: boolean
   includeMessage?: boolean
+  failover?: boolean
 }
 
 export interface XboardApiResult<T = any> {
@@ -91,12 +92,22 @@ const unwrapResult = (payload: any): XboardApiResult => {
 }
 
 export class XboardApiClient {
-  readonly baseUrl: string
+  private activeBaseUrl: string
+  private readonly baseUrls: string[]
   readonly userAgent: string
 
-  constructor(baseUrl: string, userAgent: string) {
-    this.baseUrl = baseUrl.replace(/\/+$/, '')
+  constructor(baseUrl: string, userAgent: string, baseUrls: string[] = []) {
+    const normalizedBaseUrls = [baseUrl, ...baseUrls]
+      .map((value) => value.replace(/\/+$/, ''))
+      .filter(Boolean)
+
+    this.baseUrls = [...new Set(normalizedBaseUrls)]
+    this.activeBaseUrl = this.baseUrls[0] || baseUrl.replace(/\/+$/, '')
     this.userAgent = userAgent
+  }
+
+  get baseUrl() {
+    return this.activeBaseUrl
   }
 
   get webSubscribeBase() {
@@ -110,8 +121,20 @@ export class XboardApiClient {
     )
   }
 
+  private orderedBaseUrls() {
+    return [
+      this.activeBaseUrl,
+      ...this.baseUrls.filter((baseUrl) => baseUrl !== this.activeBaseUrl),
+    ]
+  }
+
+  private shouldFailoverStatus(status: number) {
+    return status === 408 || status === 429 || status >= 500
+  }
+
   private async request<T>(path: string, options: RequestOptions = {}) {
     const method = options.method ?? 'GET'
+    const canFailover = options.failover ?? method === 'GET'
     const headers: Record<string, string> = {
       Accept: options.rawText
         ? 'text/yaml, text/plain, */*'
@@ -129,36 +152,66 @@ export class XboardApiClient {
       headers.Authorization = `Bearer ${options.authData}`
     }
 
-    const response = await xboardFetch(joinUrl(this.baseUrl, path), {
-      method,
-      connectTimeout: 8000,
-      headers,
-      body: options.body == null ? undefined : JSON.stringify(options.body),
-    })
+    let lastError: unknown
+    const baseUrls = canFailover ? this.orderedBaseUrls() : [this.activeBaseUrl]
 
-    const text = await response.text()
+    for (const baseUrl of baseUrls) {
+      let response: Response
+      const url = joinUrl(baseUrl, path)
 
-    if (!response.ok) {
+      try {
+        response = await xboardFetch(url, {
+          method,
+          connectTimeout: 8000,
+          headers,
+          body: options.body == null ? undefined : JSON.stringify(options.body),
+        })
+      } catch (error) {
+        lastError = error
+        continue
+      }
+
+      let text: string
+      try {
+        text = await response.text()
+      } catch (error) {
+        lastError = error
+        continue
+      }
+
+      if (!response.ok) {
+        const payload = parseJsonMaybe(text)
+        const error = new Error(
+          messageFromPayload(
+            payload,
+            text || `请求失败：HTTP ${response.status}`,
+          ),
+        )
+
+        if (canFailover && this.shouldFailoverStatus(response.status)) {
+          lastError = error
+          continue
+        }
+
+        throw error
+      }
+
+      this.activeBaseUrl = baseUrl
+
+      if (options.rawText) {
+        return text as T
+      }
+
       const payload = parseJsonMaybe(text)
-      throw new Error(
-        messageFromPayload(
-          payload,
-          text || `请求失败：HTTP ${response.status}`,
-        ),
-      )
+      if (payload === null && text) {
+        throw new Error('后端响应不是合法 JSON')
+      }
+
+      const result = unwrapResult(payload)
+      return (options.includeMessage ? result : result.data) as T
     }
 
-    if (options.rawText) {
-      return text as T
-    }
-
-    const payload = parseJsonMaybe(text)
-    if (payload === null && text) {
-      throw new Error('后端响应不是合法 JSON')
-    }
-
-    const result = unwrapResult(payload)
-    return (options.includeMessage ? result : result.data) as T
+    throw lastError instanceof Error ? lastError : new Error('请求失败')
   }
 
   appBootstrap() {
@@ -195,6 +248,7 @@ export class XboardApiClient {
     return this.request<XboardAuthPayload>('/api/v1/passport/auth/login', {
       method: 'POST',
       body: { email, password },
+      failover: true,
     })
   }
 

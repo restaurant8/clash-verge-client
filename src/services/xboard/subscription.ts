@@ -2,6 +2,7 @@ import yaml from 'js-yaml'
 
 import {
   createProfile,
+  deleteProfile,
   enhanceProfiles,
   getProfiles,
   patchProfile,
@@ -15,6 +16,7 @@ import type { XboardApiClient } from './api'
 import type { XboardRemoteConfig, XboardRecord } from './types'
 
 const XBOARD_PROFILE_UID = 'xboard-subscription-profile'
+const XBOARD_PROFILE_DESC = '由云端订阅服务生成，连接前会重新校验套餐和节点。'
 
 const numberValue = (value: unknown) => {
   const parsed = Number(value ?? 0)
@@ -50,6 +52,43 @@ const findXboardProfile = (
   items.find((item) => item.uid === XBOARD_PROFILE_UID) ??
   items.find((item) => item.name === profileName)
 
+const isGeneratedXboardProfile = (
+  item: IProfileItem,
+  profileName: string,
+  subscribeUrl: string,
+) =>
+  item.uid === XBOARD_PROFILE_UID ||
+  item.desc === XBOARD_PROFILE_DESC ||
+  item.url === subscribeUrl ||
+  (item.name === profileName &&
+    item.type === 'local' &&
+    item.option?.allow_auto_update === false)
+
+const cleanupStaleXboardProfiles = async (
+  activeUid: string,
+  profileName: string,
+  subscribeUrl: string,
+) => {
+  const profiles = await getProfiles()
+  const staleItems = (profiles.items ?? []).filter(
+    (item) =>
+      item.uid &&
+      item.uid !== activeUid &&
+      isGeneratedXboardProfile(item, profileName, subscribeUrl),
+  )
+
+  for (const item of staleItems) {
+    try {
+      await deleteProfile(item.uid)
+    } catch (error) {
+      console.warn('[Xboard] failed to delete stale generated profile', {
+        uid: item.uid,
+        error,
+      })
+    }
+  }
+}
+
 export const ensureXboardSubscriptionProfile = async (
   client: XboardApiClient,
   subscribeToken: string,
@@ -80,7 +119,7 @@ export const ensureXboardSubscriptionProfile = async (
     uid,
     type: 'local',
     name: profileName,
-    desc: '由云端订阅服务生成，连接前会重新校验套餐和节点。',
+    desc: XBOARD_PROFILE_DESC,
     url: subscribeUrl,
     extra: subscribeExtra(subscribeInfo),
     option: buildProfileOption(remoteConfig, baseOption),
@@ -96,7 +135,7 @@ export const ensureXboardSubscriptionProfile = async (
       {
         type: 'local',
         name: profileName,
-        desc: '由云端订阅服务生成，连接前会重新校验套餐和节点。',
+        desc: XBOARD_PROFILE_DESC,
         option: buildProfileOption(remoteConfig),
       },
       yamlText,
@@ -129,6 +168,8 @@ export const ensureXboardSubscriptionProfile = async (
   if (!switched) {
     throw new Error('订阅配置校验失败，未能切换到 Xboard profile')
   }
+
+  await cleanupStaleXboardProfiles(uid, profileName, subscribeUrl)
 
   const enhanced = await enhanceProfiles()
   if (!enhanced) {

@@ -47,7 +47,7 @@ export const CrispSupport = () => {
   )
 
   useEffect(() => {
-    if (!crispId || !session) {
+    if (!crispId) {
       window.$crisp?.push?.(['do', 'chat:hide'])
       return
     }
@@ -55,7 +55,7 @@ export const CrispSupport = () => {
     window.CRISP_WEBSITE_ID = crispId
     pushCrisp(['do', 'chat:show'])
 
-    if (session.email) {
+    if (session?.email) {
       pushCrisp(['set', 'user:email', [session.email]])
       pushCrisp(['set', 'user:nickname', [session.email]])
     }
@@ -67,9 +67,10 @@ export const CrispSupport = () => {
       'session:data',
       [
         [
-          ['email', session.email ?? ''],
+          ['email', session?.email ?? ''],
           ['client_name', appName],
           ['client_type', clientType],
+          ['auth_state', session ? 'signed_in' : 'guest'],
           ['system_type', systemName],
         ],
       ],

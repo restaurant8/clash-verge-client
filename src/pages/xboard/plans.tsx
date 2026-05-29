@@ -28,7 +28,7 @@ import {
 } from '@/components/xboard/xboard-primitives'
 import { useXboard } from '@/providers/xboard-context'
 import { openWebUrl } from '@/services/cmds'
-import { formatCurrency, orderStatusText } from '@/services/xboard/format'
+import { orderStatusText } from '@/services/xboard/format'
 import {
   findPaymentById,
   getCheckoutMessage,
@@ -79,6 +79,13 @@ const numberValue = (value: unknown) => {
   const number = Number(value ?? 0)
   return Number.isFinite(number) ? number : 0
 }
+
+const formatMoney = (value: unknown, currency = 'CNY') =>
+  new Intl.NumberFormat('zh-CN', {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: 2,
+  }).format(numberValue(value) / 100)
 
 const hasValue = (value: unknown) =>
   value !== undefined && value !== null && value !== ''
@@ -140,11 +147,50 @@ const getDiscountedPrice = (price: unknown, coupon?: XboardRecord) => {
   return Math.max(0, rawPrice - getCouponDiscount(rawPrice, coupon))
 }
 
+const getEstimatedBalanceDeduction = (amount: unknown, balance: unknown) =>
+  Math.min(Math.max(0, numberValue(amount)), Math.max(0, numberValue(balance)))
+
+const getOrderAmount = (order: unknown, key: string) => {
+  const record = asRecord(order)
+  const data = asRecord(record.data)
+  return Math.max(0, numberValue(record[key] ?? data[key]))
+}
+
+const describeOrderSettlement = (
+  order: XboardRecord | undefined,
+  currency = 'CNY',
+) => {
+  if (!order || !Object.keys(order).length) return ''
+
+  const parts: string[] = []
+  const discountAmount = getOrderAmount(order, 'discount_amount')
+  const surplusAmount = getOrderAmount(order, 'surplus_amount')
+  const balanceAmount = getOrderAmount(order, 'balance_amount')
+  const refundAmount = getOrderAmount(order, 'refund_amount')
+  const totalAmount = getOrderAmount(order, 'total_amount')
+
+  if (discountAmount > 0) {
+    parts.push(`优惠 ${formatMoney(discountAmount, currency)}`)
+  }
+  if (surplusAmount > 0) {
+    parts.push(`套餐折抵 ${formatMoney(surplusAmount, currency)}`)
+  }
+  if (balanceAmount > 0) {
+    parts.push(`余额抵扣 ${formatMoney(balanceAmount, currency)}`)
+  }
+  if (refundAmount > 0) {
+    parts.push(`返还余额 ${formatMoney(refundAmount, currency)}`)
+  }
+  parts.push(`剩余应付 ${formatMoney(totalAmount, currency)}`)
+
+  return parts.join('，')
+}
+
 const describeCoupon = (coupon: XboardRecord, currency?: string) => {
   const type = Number(coupon.type ?? coupon.discount_type ?? 0)
   const value = numberValue(coupon.value ?? coupon.discount_value)
 
-  if (type === 1) return `立减 ${formatCurrency(value, currency)}`
+  if (type === 1) return `立减 ${formatMoney(value, currency)}`
   if (type === 2) return `优惠 ${value}%`
   return '优惠码可用'
 }
@@ -153,6 +199,7 @@ const PlansPage = () => {
   const {
     session,
     client,
+    userInfo,
     subscribeInfo,
     appConfig,
     remote,
@@ -194,6 +241,13 @@ const PlansPage = () => {
     [payments],
   )
   const selectedPaymentValue = selectedPayment || defaultPayment
+  const accountBalance = numberValue(userInfo?.balance)
+  const currency = String(
+    appConfig?.payment_config?.currency ??
+      appConfig?.currency ??
+      remote.bootstrap?.payment_config?.currency ??
+      'CNY',
+  )
   const planChangeEnabled = pickBool(
     true,
     appConfig?.features?.plan_change_enable,
@@ -411,21 +465,20 @@ const PlansPage = () => {
     const period = periodByPlan[planKey] || periods[0]?.[0]
     if (!period) throw new Error('该套餐没有可购买周期')
     const planChangeOrder = isPlanChangeOrder(planId, period)
+    let couponForOrder: XboardRecord | undefined
+    const planCurrency = String(plan.currency ?? currency)
 
     setBusyPlan(planKey)
     setMessageType('info')
     setMessage('')
     try {
-      if (!selectedPaymentValue) {
-        throw new Error('当前没有可用支付方式，请刷新套餐或检查后台支付配置')
-      }
       if (planChangeOrder && !planChangeEnabled) {
         throw new Error('后台当前关闭更换订阅，请联系客服处理')
       }
 
       if (coupon.trim()) {
         setMessage('正在校验优惠码')
-        await verifyCoupon(
+        const verifiedCoupon = await verifyCoupon(
           {
             planId,
             planName: String(plan.name ?? '当前套餐'),
@@ -433,6 +486,7 @@ const PlansPage = () => {
           },
           false,
         )
+        couponForOrder = verifiedCoupon?.coupon
         setMessage(
           planChangeOrder && surplusEnabled
             ? '优惠码校验通过，正在按后台折抵规则创建订单'
@@ -446,6 +500,23 @@ const PlansPage = () => {
         )
       }
 
+      const estimatedPrice = getDiscountedPrice(plan[period], couponForOrder)
+      const estimatedBalanceDeduction = getEstimatedBalanceDeduction(
+        estimatedPrice,
+        accountBalance,
+      )
+      const estimatedPayable = Math.max(
+        0,
+        estimatedPrice - estimatedBalanceDeduction,
+      )
+      if (
+        !selectedPaymentValue &&
+        estimatedPayable > 0 &&
+        !(planChangeOrder && surplusEnabled)
+      ) {
+        throw new Error('当前没有可用支付方式，账户余额不足以覆盖该订单')
+      }
+
       const order = await client.saveOrder(session.authData, {
         plan_id: planId,
         period,
@@ -454,15 +525,40 @@ const PlansPage = () => {
       const tradeNo = getTradeNo(order)
       if (!tradeNo) throw new Error('订单创建失败，请稍后重试')
       void loadOrders(true)
+      const orderDetail = asRecord(
+        await client.orderDetail(session.authData, tradeNo).catch(() => ({})),
+      )
+      const settlement = describeOrderSettlement(orderDetail, planCurrency)
+      const remainingAmount =
+        Object.keys(orderDetail).length > 0
+          ? getOrderAmount(orderDetail, 'total_amount')
+          : undefined
+      const needsPayment = remainingAmount === undefined || remainingAmount > 0
+
+      if (needsPayment && !selectedPaymentValue) {
+        setMessageType('error')
+        setMessage(
+          `订单已创建：${tradeNo}${
+            settlement ? `，${settlement}` : ''
+          }，但当前没有可用支付方式，请在订单页稍后继续处理。`,
+        )
+        await loadOrders(true)
+        return
+      }
+
       setMessage(
         planChangeOrder && surplusEnabled
-          ? `订单已创建：${tradeNo}，已由后台计算折抵，正在发起支付`
-          : `订单已创建：${tradeNo}，正在发起支付`,
+          ? `订单已创建：${tradeNo}${
+              settlement ? `，${settlement}` : ''
+            }，已由后台计算折抵，正在确认支付`
+          : `订单已创建：${tradeNo}${
+              settlement ? `，${settlement}` : ''
+            }，正在确认支付`,
       )
 
       const checkoutResult = await client.checkoutOrder(session.authData, {
         trade_no: tradeNo,
-        method: selectedPaymentValue,
+        ...(selectedPaymentValue ? { method: selectedPaymentValue } : {}),
       })
 
       if (isCheckoutCompleted(checkoutResult)) {
@@ -479,7 +575,9 @@ const PlansPage = () => {
       } else {
         setMessage(
           getCheckoutMessage(checkoutResult) ||
-            '支付请求已提交，请在订单页继续确认状态',
+            (needsPayment
+              ? '支付请求已提交，请在订单页继续确认状态'
+              : '订单确认已提交，请稍后刷新订单状态'),
         )
       }
 
@@ -573,7 +671,7 @@ const PlansPage = () => {
 
         <XboardPanel title="下单设置">
           <Grid container spacing={1.5}>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="优惠券"
                 placeholder="可选"
@@ -589,7 +687,7 @@ const PlansPage = () => {
                   }
                 }}
                 fullWidth
-                helperText={couponMessage || undefined}
+                helperText={couponMessage || ' '}
                 color={couponMessageType === 'success' ? 'success' : undefined}
                 error={couponMessageType === 'error'}
                 slotProps={{
@@ -622,7 +720,7 @@ const PlansPage = () => {
                 }}
               />
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 select
                 label="支付方式"
@@ -645,6 +743,16 @@ const PlansPage = () => {
                 )}
               </TextField>
             </Grid>
+            <Grid size={{ xs: 12 }}>
+              <Alert severity="info" sx={{ alignItems: 'center' }}>
+                {accountBalance > 0
+                  ? `下单时后台会自动使用账户余额抵扣，当前可用 ${formatMoney(
+                      accountBalance,
+                      currency,
+                    )}，最终应付以订单详情为准。`
+                  : '下单时如账户存在余额，后台会自动抵扣；最终应付以订单详情为准。'}
+              </Alert>
+            </Grid>
           </Grid>
         </XboardPanel>
 
@@ -665,8 +773,17 @@ const PlansPage = () => {
                   : undefined
               const discountedPrice = getDiscountedPrice(price, appliedCoupon)
               const discountAmount = numberValue(price) - discountedPrice
+              const balanceDeduction = getEstimatedBalanceDeduction(
+                discountedPrice,
+                accountBalance,
+              )
+              const estimatedPayable = Math.max(
+                0,
+                discountedPrice - balanceDeduction,
+              )
               const planChangeOrder = isPlanChangeOrder(planId, period)
               const purchaseDisabled = planChangeOrder && !planChangeEnabled
+              const planCurrency = String(plan.currency ?? currency)
 
               return (
                 <Grid size={{ xs: 12, md: 6, xl: 4 }} key={key}>
@@ -695,12 +812,14 @@ const PlansPage = () => {
                         sx={{ fontWeight: 900, color: 'primary.main' }}
                       >
                         {period
-                          ? formatCurrency(
-                              discountedPrice,
-                              plan.currency ?? 'CNY',
-                            )
+                          ? formatMoney(estimatedPayable, planCurrency)
                           : '-'}
                       </Typography>
+                      {balanceDeduction > 0 && (
+                        <Typography variant="caption" color="text.secondary">
+                          预计余额抵扣 {formatMoney(balanceDeduction, planCurrency)}
+                        </Typography>
+                      )}
                       {appliedCoupon && discountAmount > 0 && (
                         <Typography variant="caption" color="text.secondary">
                           原价{' '}
@@ -709,13 +828,15 @@ const PlansPage = () => {
                             variant="caption"
                             sx={{ textDecoration: 'line-through' }}
                           >
-                            {formatCurrency(price, plan.currency ?? 'CNY')}
+                            {formatMoney(price, planCurrency)}
                           </Typography>
                           {' · 已优惠 '}
-                          {formatCurrency(
-                            discountAmount,
-                            plan.currency ?? 'CNY',
-                          )}
+                          {formatMoney(discountAmount, planCurrency)}
+                        </Typography>
+                      )}
+                      {planChangeOrder && surplusEnabled && (
+                        <Typography variant="caption" color="text.secondary">
+                          创建订单后会再按后台规则计算套餐折抵
                         </Typography>
                       )}
                       <TextField
@@ -738,10 +859,7 @@ const PlansPage = () => {
                         {periods.map(([periodKey, label]) => (
                           <MenuItem key={periodKey} value={periodKey}>
                             {label} ·{' '}
-                            {formatCurrency(
-                              plan[periodKey],
-                              plan.currency ?? 'CNY',
-                            )}
+                            {formatMoney(plan[periodKey], planCurrency)}
                           </MenuItem>
                         ))}
                       </TextField>

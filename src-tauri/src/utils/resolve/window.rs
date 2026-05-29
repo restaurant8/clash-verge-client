@@ -11,19 +11,44 @@ const LIGHT_BACKGROUND_COLOR: Color = Color(245, 245, 245, 255); // #F5F5F5
 const DARK_BACKGROUND_HEX: &str = "#2E303D";
 const LIGHT_BACKGROUND_HEX: &str = "#F5F5F5";
 
-// 定义默认窗口尺寸常量
-const DEFAULT_WIDTH: f64 = 940.0;
-const DEFAULT_HEIGHT: f64 = 700.0;
+// Start compact and borderless for the login screen; the frontend expands it after auth.
+const DEFAULT_WIDTH: f64 = 520.0;
+const DEFAULT_HEIGHT: f64 = 560.0;
 
 const MINIMAL_WIDTH: f64 = 520.0;
 const MINIMAL_HEIGHT: f64 = 520.0;
 
-#[cfg(target_os = "linux")]
-const DEFAULT_DECORATIONS: bool = false;
-#[cfg(not(target_os = "linux"))]
-const DEFAULT_DECORATIONS: bool = true;
+#[cfg(windows)]
+fn strip_windows_login_frame(window: &WebviewWindow) {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GWL_STYLE, GetWindowLongPtrW, SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetWindowLongPtrW,
+        SetWindowPos, WS_CAPTION, WS_THICKFRAME,
+    };
 
-/// 构建新的 WebView 窗口
+    let Ok(hwnd) = window.hwnd() else {
+        return;
+    };
+
+    unsafe {
+        let style = GetWindowLongPtrW(hwnd, GWL_STYLE);
+        let stripped = (style as u32) & !WS_CAPTION.0 & !WS_THICKFRAME.0;
+        SetWindowLongPtrW(hwnd, GWL_STYLE, stripped as isize);
+        let _ = SetWindowPos(
+            hwnd,
+            None,
+            0,
+            0,
+            0,
+            0,
+            SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER,
+        );
+    }
+}
+
+#[cfg(not(windows))]
+fn strip_windows_login_frame(_window: &WebviewWindow) {}
+
+/// Build a new WebView window.
 pub async fn build_new_window() -> Result<WebviewWindow, String> {
     let app_handle = handle::Handle::app_handle();
 
@@ -61,20 +86,23 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
         "main", /* the unique window label */
         tauri::WebviewUrl::App(start_page.into()),
     )
-    .title("Clash Verge")
+    .title("MuaCloud")
     .center()
-    .decorations(DEFAULT_DECORATIONS)
+    .decorations(false)
     .fullscreen(false)
     .inner_size(DEFAULT_WIDTH, DEFAULT_HEIGHT)
     .min_inner_size(MINIMAL_WIDTH, MINIMAL_HEIGHT)
-    .visible(false) // 等待主题色准备好后再展示，避免启动色差
+    .resizable(false)
+    .shadow(false)
+    .visible(false)
+    .general_autofill_enabled(false) // Disable browser autofill
     .initialization_script(&initial_script)
-    .general_autofill_enabled(false) // 禁用自动填充
     .on_page_load(move |window, payload| {
         if payload.event() != PageLoadEvent::Finished {
             return;
         }
 
+        strip_windows_login_frame(&window);
         logging_error!(Type::Window, window.show());
         logging_error!(Type::Window, window.set_focus());
     });
@@ -87,6 +115,7 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
 
     match builder.build() {
         Ok(window) => {
+            strip_windows_login_frame(&window);
             logging_error!(Type::Window, window.set_background_color(Some(background_color)));
             Ok(window)
         }

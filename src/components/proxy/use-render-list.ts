@@ -77,15 +77,28 @@ type GroupCache = {
   items: IRenderItem[]
 }
 
+interface RenderListOptions {
+  defaultOpenFirst?: boolean
+  hideGroupNames?: string[]
+  hideGroupTypes?: string[]
+}
+
+const DEFAULT_OPEN_STATE: HeadState = {
+  ...DEFAULT_STATE,
+  open: true,
+}
+
+const normalizeGroupType = (value: unknown) =>
+  String(value ?? '').replace(/[-_\s]/g, '').toLowerCase()
+
 // 优化列布局计算
 const calculateColumns = (width: number, configCol: number): number => {
   if (configCol > 0 && configCol < 6) return configCol
 
-  if (width > 1920) return 5
-  if (width > 1450) return 4
-  if (width > 1024) return 3
-  if (width > 900) return 2
-  if (width >= 600) return 2
+  if (width > 1680) return 5
+  if (width > 1280) return 4
+  if (width >= 760) return 3
+  if (width >= 520) return 2
   return 1
 }
 
@@ -106,6 +119,7 @@ export const useRenderList = (
   mode: string,
   isChainMode?: boolean,
   selectedGroup?: string | null,
+  options: RenderListOptions = {},
 ) => {
   // 使用全局数据提供者
   const { proxies: proxiesData } = useProxiesData()
@@ -114,6 +128,15 @@ export const useRenderList = (
   const { width } = useWindowWidth()
   const [headStates, setHeadState] = useHeadStateNew()
   const latencyTimeout = verge?.default_latency_timeout
+  const hiddenGroupNames = useMemo(
+    () => options.hideGroupNames ?? [],
+    [options.hideGroupNames],
+  )
+  const hiddenGroupTypes = useMemo(
+    () => options.hideGroupTypes ?? [],
+    [options.hideGroupTypes],
+  )
+  const defaultOpenFirst = options.defaultOpenFirst ?? false
 
   // 获取运行时配置用于链式代理模式
   const { data: runtimeConfig } = useRuntimeConfig(!!isChainMode)
@@ -379,16 +402,26 @@ export const useRenderList = (
 
     // 正常模式的渲染逻辑
     const useRule = mode === 'rule' || mode === 'script'
-    const renderGroups =
+    const sourceGroups: ProxyGroup[] =
       useRule && proxiesData.groups.length
         ? proxiesData.groups
         : [proxiesData.global!]
+    const hiddenNameSet = new Set(hiddenGroupNames)
+    const hiddenTypeSet = new Set(hiddenGroupTypes.map(normalizeGroupType))
+    const renderGroups = sourceGroups.filter(
+      (group: ProxyGroup) =>
+        !hiddenNameSet.has(group.name) &&
+        !hiddenTypeSet.has(normalizeGroupType(group.type)),
+    )
+    const firstGroupName = defaultOpenFirst ? renderGroups[0]?.name : undefined
 
     const cache = groupCacheRef.current
     let anyChanged = false
 
     const retList = renderGroups.flatMap((group: ProxyGroup) => {
-      const headState = headStates[group.name] || DEFAULT_STATE
+      const headState =
+        headStates[group.name] ||
+        (group.name === firstGroupName ? DEFAULT_OPEN_STATE : DEFAULT_STATE)
       const cached = cache.get(group.name)
 
       if (
@@ -497,6 +530,9 @@ export const useRenderList = (
     runtimeConfig,
     selectedGroup,
     latencyTimeout,
+    defaultOpenFirst,
+    hiddenGroupNames,
+    hiddenGroupTypes,
   ])
 
   return {

@@ -9,6 +9,7 @@ import { useEffect, useMemo } from 'react'
 import { useVerge } from '@/hooks/use-verge'
 import { defaultDarkTheme, defaultTheme } from '@/pages/_theme'
 import { useSetThemeMode, useThemeMode } from '@/services/states'
+import { isTauriRuntime } from '@/utils/tauri'
 
 const CSS_INJECTION_SCOPE_ROOT = '[data-css-injection-root]'
 const CSS_INJECTION_SCOPE_LIMIT =
@@ -66,7 +67,17 @@ ${css}
  * custom theme
  */
 export const useCustomTheme = () => {
-  const appWindow: WebviewWindow = useMemo(() => getCurrentWebviewWindow(), [])
+  const appWindow: WebviewWindow = useMemo(
+    () =>
+      isTauriRuntime()
+        ? getCurrentWebviewWindow()
+        : ({
+            theme: async () => null,
+            onThemeChanged: async () => () => {},
+            setTheme: async () => {},
+          } as unknown as WebviewWindow),
+    [],
+  )
   const { verge } = useVerge()
   const { theme_mode, theme_setting } = verge ?? {}
   const mode = useThemeMode()

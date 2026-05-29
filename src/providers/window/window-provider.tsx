@@ -2,13 +2,32 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 
 import debounce from '@/utils/debounce'
+import { isTauriRuntime } from '@/utils/tauri'
 
 import { WindowContext } from './window-context'
 
 export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const currentWindow = useMemo(() => getCurrentWindow(), [])
+  const currentWindow = useMemo(
+    () =>
+      isTauriRuntime()
+        ? getCurrentWindow()
+        : ({
+            close: async () => {},
+            minimize: async () => {},
+            isMaximized: async () => false,
+            maximize: async () => {},
+            unmaximize: async () => {},
+            isFullscreen: async () => false,
+            setFullscreen: async () => {},
+            isDecorated: async () => true,
+            setDecorations: async () => {},
+            setMinimizable: async () => {},
+            onResized: async () => () => {},
+          } as unknown as ReturnType<typeof getCurrentWindow>),
+    [],
+  )
   const [decorated, setDecorated] = useState<boolean | null>(null)
   const [maximized, setMaximized] = useState<boolean | null>(null)
 

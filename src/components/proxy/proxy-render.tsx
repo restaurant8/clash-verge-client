@@ -23,8 +23,20 @@ import { useThemeMode } from '@/services/states'
 import { ProxyHead } from './proxy-head'
 import { ProxyItem } from './proxy-item'
 import { ProxyItemMini } from './proxy-item-mini'
-import { HeadState } from './use-head-state'
+import type { HeadState } from './use-head-state'
 import type { IRenderItem } from './use-render-list'
+
+const groupTypeText = (type: string) => {
+  const normalized = type.replace(/[-_\s]/g, '').toLowerCase()
+  const labels: Record<string, string> = {
+    selector: '手动选择',
+    urltest: '自动测速',
+    fallback: '故障转移',
+    loadbalance: '负载均衡',
+    relay: '中继',
+  }
+  return labels[normalized] ?? type
+}
 
 interface RenderProps {
   item: IRenderItem
@@ -130,7 +142,7 @@ export const ProxyRender = (props: RenderProps) => {
               }}
             >
               <Box component="span" sx={{ marginTop: '2px' }}>
-                <StyledTypeBox>{group.type}</StyledTypeBox>
+                <StyledTypeBox>{groupTypeText(group.type)}</StyledTypeBox>
                 <StyledSubtitle sx={{ color: 'text.secondary' }}>
                   {group.now}
                 </StyledSubtitle>
@@ -212,12 +224,12 @@ export const ProxyRender = (props: RenderProps) => {
     return (
       <Box
         sx={{
-          height: 56,
+          height: 64,
           display: 'grid',
-          gap: 1,
-          pl: 2,
-          pr: 2,
-          pb: 1,
+          gap: 1.25,
+          pl: 1.75,
+          pr: 1.75,
+          pb: 1.25,
           gridTemplateColumns: `repeat(${item.col! || 2}, 1fr)`,
         }}
       >

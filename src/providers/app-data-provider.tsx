@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { listen } from '@tauri-apps/api/event'
-import React, { useCallback, useEffect, useMemo, useRef } from 'react'
+import type React from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import {
   getBaseConfig,
   getRuleProviders,
@@ -16,6 +17,7 @@ import {
   getSystemProxy,
 } from '@/services/cmds'
 import { queryClient } from '@/services/query-client'
+import { isTauriRuntime } from '@/utils/tauri'
 
 import {
   ClashConfigContext,
@@ -122,6 +124,8 @@ export const AppDataProvider = ({
   const refreshRuleProviders = useStableFn(_refetchRuleProviders)
 
   useEffect(() => {
+    if (!isTauriRuntime()) return
+
     let lastProfileId: string | null = null
     let lastUpdateTime = 0
     const refreshThrottle = 800
@@ -139,6 +143,7 @@ export const AppDataProvider = ({
       lastProfileId = newProfileId
       lastUpdateTime = now
       void queryClient.invalidateQueries({ queryKey: ['getProfiles'] })
+      refreshProxy().catch(() => {})
       refreshRules().catch(() => {})
       refreshRuleProviders().catch(() => {})
     }

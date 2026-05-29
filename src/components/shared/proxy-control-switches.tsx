@@ -8,21 +8,33 @@ import {
 } from '@mui/icons-material'
 import { Box, Typography, alpha, useTheme } from '@mui/material'
 import { useLockFn } from 'ahooks'
-import React, { useCallback, useRef, useState } from 'react'
+import type React from 'react'
+import { Suspense, lazy, useCallback, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { DialogRef, Switch, TooltipIcon } from '@/components/base'
-import { SysproxyViewer } from '@/components/setting/mods/sysproxy-viewer'
-import { TunViewer } from '@/components/setting/mods/tun-viewer'
+import { type DialogRef, Switch, TooltipIcon } from '@/components/base'
 import { useServiceInstaller } from '@/hooks/use-service-installer'
 import { useServiceUninstaller } from '@/hooks/use-service-uninstaller'
 import { useSystemProxyState } from '@/hooks/use-system-proxy-state'
 import { useSystemState } from '@/hooks/use-system-state'
 import { useVerge } from '@/hooks/use-verge'
 import { showNotice } from '@/services/notice-service'
+import { isTauriRuntime } from '@/utils/tauri'
+
+const SysproxyViewer = lazy(() =>
+  import('@/components/setting/mods/sysproxy-viewer').then((module) => ({
+    default: module.SysproxyViewer,
+  })),
+)
+const TunViewer = lazy(() =>
+  import('@/components/setting/mods/tun-viewer').then((module) => ({
+    default: module.TunViewer,
+  })),
+)
 
 interface ProxySwitchProps {
   label?: string
+  mode?: 'system' | 'tun'
   onError?: (err: Error) => void
   noRightPadding?: boolean
 }
@@ -56,6 +68,7 @@ const SwitchRow = ({
 }: SwitchRowProps) => {
   const theme = useTheme()
   const [checked, setChecked] = useState(active)
+  const [pending, setPending] = useState(false)
   const pendingRef = useRef(false)
 
   if (pendingRef.current) {
@@ -66,6 +79,7 @@ const SwitchRow = ({
 
   const handleChange = (_: React.ChangeEvent, value: boolean) => {
     pendingRef.current = true
+    setPending(true)
     setChecked(value)
     onToggle(value)
       .catch((err: any) => {
@@ -74,6 +88,7 @@ const SwitchRow = ({
       })
       .finally(() => {
         pendingRef.current = false
+        setPending(false)
       })
   }
 
@@ -116,7 +131,7 @@ const SwitchRow = ({
 
       <Switch
         edge="end"
-        disabled={disabled}
+        disabled={disabled || pending}
         checked={checked}
         onChange={handleChange}
       />
@@ -126,6 +141,7 @@ const SwitchRow = ({
 
 const ProxyControlSwitches = ({
   label,
+  mode,
   onError,
   noRightPadding = false,
 }: ProxySwitchProps) => {
@@ -140,6 +156,7 @@ const ProxyControlSwitches = ({
 
   const sysproxyRef = useRef<DialogRef>(null)
   const tunRef = useRef<DialogRef>(null)
+  const canOpenPlatformDialogs = isTauriRuntime()
 
   const { enable_tun_mode } = verge ?? {}
 
@@ -179,9 +196,11 @@ const ProxyControlSwitches = ({
     }
   })
 
-  const isSystemProxyMode =
-    label === t('settings.sections.system.toggles.systemProxy') || !label
-  const isTunMode = label === t('settings.sections.system.toggles.tunMode')
+  const switchMode =
+    mode ??
+    (label === t('settings.sections.system.toggles.tunMode') ? 'tun' : 'system')
+  const isSystemProxyMode = switchMode === 'system'
+  const isTunMode = switchMode === 'tun'
 
   return (
     <Box sx={{ width: '100%', pr: noRightPadding ? 1 : 2 }}>
@@ -190,7 +209,11 @@ const ProxyControlSwitches = ({
           label={t('settings.sections.proxyControl.fields.systemProxy')}
           active={systemProxyIndicator}
           infoTitle={t('settings.sections.proxyControl.tooltips.systemProxy')}
-          onInfoClick={() => sysproxyRef.current?.open()}
+          onInfoClick={() =>
+            canOpenPlatformDialogs
+              ? sysproxyRef.current?.open()
+              : showNotice.info('系统代理详细设置需要在桌面客户端中打开')
+          }
           onToggle={(value) => toggleSystemProxy(value)}
           onError={onError}
           highlight={systemProxyIndicator}
@@ -202,7 +225,11 @@ const ProxyControlSwitches = ({
           label={t('settings.sections.proxyControl.fields.tunMode')}
           active={enable_tun_mode || false}
           infoTitle={t('settings.sections.proxyControl.tooltips.tunMode')}
-          onInfoClick={() => tunRef.current?.open()}
+          onInfoClick={() =>
+            canOpenPlatformDialogs
+              ? tunRef.current?.open()
+              : showNotice.info('TUN 详细设置需要在桌面客户端中打开')
+          }
           onToggle={handleTunToggle}
           onError={onError}
           disabled={!isTunModeAvailable}
@@ -245,8 +272,12 @@ const ProxyControlSwitches = ({
         />
       )}
 
-      <SysproxyViewer ref={sysproxyRef} />
-      <TunViewer ref={tunRef} />
+      {canOpenPlatformDialogs && (
+        <Suspense fallback={null}>
+          <SysproxyViewer ref={sysproxyRef} />
+          <TunViewer ref={tunRef} />
+        </Suspense>
+      )}
     </Box>
   )
 }

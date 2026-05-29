@@ -2,7 +2,7 @@ import { LanRounded, SettingsRounded } from '@mui/icons-material'
 import { MenuItem, Select, TextField, Typography } from '@mui/material'
 import { invoke } from '@tauri-apps/api/core'
 import { useLockFn } from 'ahooks'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { updateGeo } from 'tauri-plugin-mihomo-api'
 
@@ -47,10 +47,11 @@ const SettingClash = ({ onError }: Props) => {
 
   const { verge_mixed_port } = verge ?? {}
 
-  // 独立跟踪DNS设置开关状态
-  const [dnsSettingsEnabled, setDnsSettingsEnabled] = useState(() => {
-    return verge?.enable_dns_settings ?? false
-  })
+  const [dnsSettingsOverride, setDnsSettingsOverride] = useState<
+    boolean | undefined
+  >()
+  const dnsSettingsEnabled =
+    dnsSettingsOverride ?? verge?.enable_dns_settings ?? true
 
   const webRef = useRef<DialogRef>(null)
   const portRef = useRef<DialogRef>(null)
@@ -76,20 +77,33 @@ const SettingClash = ({ onError }: Props) => {
 
   // 实现DNS设置开关处理函数
   const handleDnsToggle = useLockFn(async (enable: boolean) => {
+    const previous = dnsSettingsEnabled
     try {
-      setDnsSettingsEnabled(enable)
+      setDnsSettingsOverride(enable)
       await patchVerge({ enable_dns_settings: enable })
       await invoke('apply_dns_config', { apply: enable })
+      setDnsSettingsOverride(undefined)
       setTimeout(() => {
         mutateClash()
       }, 500)
     } catch (err: any) {
-      setDnsSettingsEnabled(!enable)
+      setDnsSettingsOverride(previous)
       showNotice.error(err)
-      await patchVerge({ enable_dns_settings: !enable }).catch(() => {})
+      await patchVerge({ enable_dns_settings: previous }).catch(() => {})
       throw err
     }
   })
+
+  useEffect(() => {
+    if (!verge) return
+    if (verge.enable_dns_settings === undefined) {
+      void patchVerge({ enable_dns_settings: true })
+        .then(() =>
+          invoke('apply_dns_config', { apply: true }).catch(() => undefined),
+        )
+        .catch(() => undefined)
+    }
+  }, [patchVerge, verge])
 
   return (
     <SettingList title={t('settings.sections.clash.title')}>

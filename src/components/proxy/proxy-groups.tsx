@@ -57,6 +57,9 @@ interface Props {
   mode: string
   isChainMode?: boolean
   chainConfigData?: string | null
+  defaultOpenFirst?: boolean
+  hideGroupNames?: string[]
+  hideGroupTypes?: string[]
 }
 
 interface ProxyChainItem {
@@ -69,7 +72,14 @@ interface ProxyChainItem {
 export const ProxyGroups = (props: Props) => {
   const { t } = useTranslation()
   const { pathname } = useLocation()
-  const { mode, isChainMode = false, chainConfigData } = props
+  const {
+    mode,
+    isChainMode = false,
+    chainConfigData,
+    defaultOpenFirst,
+    hideGroupNames,
+    hideGroupTypes,
+  } = props
 
   // Drive 3s polling on the shared TQ cache; data is read via granular context below
   useQuery({
@@ -135,6 +145,11 @@ export const ProxyGroups = (props: Props) => {
     mode,
     isChainMode,
     activeSelectedGroup,
+    {
+      defaultOpenFirst,
+      hideGroupNames,
+      hideGroupTypes,
+    },
   )
 
   const getGroupHeadState = useCallback(

@@ -1,0 +1,90 @@
+export type XboardRecord = Record<string, any>
+
+export interface XboardRemoteConfig extends XboardRecord {
+  APP_NAME: string
+  login_title: string
+  APP_URL: string
+  custom_ua: string
+  app_logo: string
+  oss_url: string
+  api_domains: string
+  backup_api_domains: string
+  subscribe_path: string
+  tg_channel: string
+  telegram_bot: string
+  official_url: string
+  invite_domain: string
+  crisp_id: string
+  imgbb_api_key: string
+  discount_delay_seconds: number
+  version: string
+  update_notes: string
+  force_update: boolean
+  latest_client_url: string
+}
+
+export interface XboardBootstrapData extends XboardRecord {
+  app_info?: XboardRecord
+  features?: XboardRecord
+  guest_config?: XboardRecord
+  public_ui_config?: XboardRecord
+  ui_config?: XboardRecord
+  download_urls?: XboardRecord
+  remote_config?: Partial<XboardRemoteConfig>
+  config_hash?: string
+}
+
+export interface XboardResolvedConfig {
+  remoteConfig: XboardRemoteConfig
+  bootstrap?: XboardBootstrapData
+  activeApiDomain: string
+  apiDomains: string[]
+  configSource: string
+  fetchedAt: number
+  degraded: boolean
+  error?: string
+}
+
+export interface XboardSession {
+  authData: string
+  subscribeToken: string
+  isAdmin?: boolean
+  email?: string
+  loggedInAt: number
+}
+
+export interface XboardAccountSnapshot {
+  session: XboardSession
+  userInfo?: XboardRecord
+  subscribeInfo?: XboardRecord
+  servers: XboardRecord[]
+  appConfig?: XboardRecord
+  notices: XboardRecord[]
+}
+
+export interface XboardResourceCache {
+  plans?: XboardRecord[]
+  payments?: XboardRecord[]
+  orders?: XboardRecord[]
+  tickets?: XboardRecord[]
+  ticketDetails: Record<string, XboardRecord>
+  activeSessions?: XboardRecord[]
+  trafficLogs?: XboardRecord[]
+}
+
+export interface XboardConnectionState {
+  status: 'disconnected' | 'connecting' | 'connected' | 'error'
+  message?: string
+  connectedAt?: number
+}
+
+export interface XboardAuthPayload extends XboardRecord {
+  auth_data?: string
+  token?: string
+  is_admin?: boolean
+}
+
+export interface XboardOrderCheckoutResult {
+  type: number
+  data: any
+}

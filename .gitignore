@@ -12,6 +12,7 @@ scripts/_env.sh
 .old
 .eslintcache
 .changelog_backups
+.codex-run
 target
 CLAUDE.md
 .vfox.toml

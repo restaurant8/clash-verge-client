@@ -12,6 +12,7 @@ import { BaseErrorBoundary } from './components/base'
 import { router } from './pages/_routers'
 import { AppDataProvider } from './providers/app-data-provider'
 import { WindowProvider } from './providers/window'
+import { XboardProvider } from './providers/xboard-provider'
 import { FALLBACK_LANGUAGE, initializeLanguage } from './services/i18n'
 import {
   preloadAppData,
@@ -25,6 +26,7 @@ import {
   UpdateStateProvider,
 } from './services/states'
 import { disableWebViewShortcuts } from './utils/disable-webview-shortcuts'
+import { isTauriRuntime } from './utils/tauri'
 
 if (!window.ResizeObserver) {
   window.ResizeObserver = ResizeObserver
@@ -54,7 +56,9 @@ const initializeApp = (initialThemeMode: 'light' | 'dark') => {
           <QueryClientProvider client={queryClient}>
             <WindowProvider>
               <AppDataProvider>
-                <RouterProvider router={router} />
+                <XboardProvider>
+                  <RouterProvider router={router} />
+                </XboardProvider>
               </AppDataProvider>
             </WindowProvider>
           </QueryClientProvider>
@@ -98,11 +102,15 @@ window.addEventListener('unhandledrejection', (event) => {
 // Page close/refresh events
 window.addEventListener('beforeunload', () => {
   // Clean up all WebSocket instances to prevent memory leaks
-  MihomoWebSocket.cleanupAll()
+  if (isTauriRuntime()) {
+    MihomoWebSocket.cleanupAll()
+  }
 })
 
 // Page loaded event
 window.addEventListener('DOMContentLoaded', () => {
   // Clean up all WebSocket instances to prevent memory leaks
-  MihomoWebSocket.cleanupAll()
+  if (isTauriRuntime()) {
+    MihomoWebSocket.cleanupAll()
+  }
 })

@@ -4,6 +4,7 @@ import { getProxies, getProxyProviders } from 'tauri-plugin-mihomo-api'
 
 import { showNotice } from '@/services/notice-service'
 import { debugLog } from '@/utils/debug'
+import { isTauriRuntime } from '@/utils/tauri'
 
 export async function copyClashEnv() {
   return invoke<void>('copy_clash_env')
@@ -276,6 +277,13 @@ export async function getSystemProxy() {
 }
 
 export async function getAutotemProxy() {
+  if (!isTauriRuntime()) {
+    return {
+      enable: false,
+      url: '',
+    }
+  }
+
   try {
     debugLog('[API] 开始调用 get_auto_proxy')
     const result = await invoke<{
@@ -519,6 +527,7 @@ export async function validateScriptFile(filePath: string) {
 
 // 获取当前运行模式
 export const getRunningMode = async () => {
+  if (!isTauriRuntime()) return 'Sidecar'
   return invoke<string>('get_running_mode')
 }
 
@@ -549,6 +558,8 @@ export const repairService = async () => {
 
 // 系统服务是否可用
 export const isServiceAvailable = async () => {
+  if (!isTauriRuntime()) return false
+
   try {
     return await invoke<boolean>('is_service_available')
   } catch (error) {
@@ -565,6 +576,8 @@ export const exit_lightweight_mode = async () => {
 }
 
 export const isAdmin = async () => {
+  if (!isTauriRuntime()) return false
+
   try {
     return await invoke<boolean>('app_is_admin')
   } catch (error) {

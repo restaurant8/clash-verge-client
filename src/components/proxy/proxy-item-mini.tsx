@@ -33,7 +33,7 @@ export const ProxyItemMini = (props: Props) => {
       onClick={() => onClick?.(proxy.name)}
       sx={[
         {
-          height: 56,
+          height: 58,
           borderRadius: 1.5,
           pl: 1.5,
           pr: 1,

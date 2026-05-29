@@ -12,15 +12,8 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import {
-  Box,
-  List,
-  Menu,
-  MenuItem,
-  Paper,
-  SvgIcon,
-  ThemeProvider,
-} from '@mui/material'
+import { Box, List, Menu, MenuItem, Paper, ThemeProvider } from '@mui/material'
+import { LogicalSize } from '@tauri-apps/api/dpi'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import type { CSSProperties } from 'react'
@@ -28,20 +21,23 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 
-import iconDark from '@/assets/image/icon_dark.svg?react'
-import iconLight from '@/assets/image/icon_light.svg?react'
-import LogoSvg from '@/assets/image/logo.svg?react'
+import brandLogo from '@/assets/image/muacloud-mascot-logo.png'
 import { BaseErrorBoundary } from '@/components/base'
 import { LayoutItem } from '@/components/layout/layout-item'
 import { LayoutTraffic } from '@/components/layout/layout-traffic'
 import { NoticeManager } from '@/components/layout/notice-manager'
 import { UpdateButton } from '@/components/layout/update-button'
 import { WindowControls } from '@/components/layout/window-controller'
+import { CrispSupport } from '@/components/xboard/crisp-support'
+import { XboardAnnouncementDialog } from '@/components/xboard/xboard-announcement-dialog'
 import { useI18n } from '@/hooks/use-i18n'
 import { useVerge } from '@/hooks/use-verge'
+import { useWindow } from '@/hooks/use-window'
 import { useWindowDecorations } from '@/hooks/use-window'
+import { useXboard } from '@/providers/xboard-context'
 import { useThemeMode } from '@/services/states'
 import getSystem from '@/utils/get-system'
+import { isTauriRuntime } from '@/utils/tauri'
 
 import {
   useCustomTheme,
@@ -50,8 +46,7 @@ import {
   useNavMenuOrder,
 } from './_layout/hooks'
 import { handleNoticeMessage } from './_layout/utils'
-import { navItems } from './_routers'
-import LogsPage from './logs'
+import { navItems } from './_nav-items'
 
 import 'dayjs/locale/ru'
 import 'dayjs/locale/zh-cn'
@@ -108,11 +103,15 @@ const SortableNavMenuItem = ({ item, label }: SortableNavMenuItemProps) => {
 dayjs.extend(relativeTime)
 
 const OS = getSystem()
+const AUTH_WINDOW_SIZE = new LogicalSize(520, 560)
+const AUTH_WINDOW_MIN_SIZE = new LogicalSize(520, 520)
+const APP_WINDOW_SIZE = new LogicalSize(940, 700)
+const APP_WINDOW_MIN_SIZE = new LogicalSize(860, 620)
 
 const Layout = () => {
   const mode = useThemeMode()
-  const isDark = mode !== 'light'
   const { t } = useTranslation()
+  const { remote, session, booting, appConfig } = useXboard()
   const { theme } = useCustomTheme()
   const { verge, mutateVerge, patchVerge } = useVerge()
   const { language } = verge ?? {}
@@ -120,17 +119,21 @@ const Layout = () => {
   const { switchLanguage } = useI18n()
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const isLogsPage = pathname === '/logs'
-  const logsPageMountedRef = useRef(false)
-  if (isLogsPage) logsPageMountedRef.current = true
+  const shouldShowAppShell = Boolean(session)
   const themeReady = useMemo(() => Boolean(theme), [theme])
+  const resolveNavLabel = useCallback(
+    (label: string) => (label.includes('.') ? t(label) : label),
+    [t],
+  )
 
   const [menuUnlocked, setMenuUnlocked] = useState(false)
   const [menuContextPosition, setMenuContextPosition] =
     useState<MenuContextPosition | null>(null)
 
   const windowControlsRef = useRef<any>(null)
-  const { decorated } = useWindowDecorations()
+  const lastWindowModeRef = useRef<'auth' | 'app' | null>(null)
+  const { currentWindow } = useWindow()
+  const { decorated, refreshDecorated } = useWindowDecorations()
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -158,6 +161,22 @@ const Layout = () => {
     [patchVerge],
   )
 
+  const visibleNavItems = useMemo(() => {
+    const features = appConfig?.features ?? remote.bootstrap?.features ?? {}
+    const isFeatureEnabled = (key: string) =>
+      ![false, 0, '0', 'false'].includes(features[key])
+
+    return navItems.filter((item) => {
+      if (item.path === '/tickets') {
+        return isFeatureEnabled('enable_ticket_system')
+      }
+      if (item.path === '/traffic-records') {
+        return isFeatureEnabled('enable_traffic_log')
+      }
+      return true
+    })
+  }, [appConfig?.features, remote.bootstrap?.features])
+
   const {
     menuOrder,
     navItemMap,
@@ -166,7 +185,7 @@ const Layout = () => {
     resetMenuOrder,
   } = useNavMenuOrder({
     enabled: menuUnlocked,
-    items: navItems,
+    items: visibleNavItems,
     storedOrder: verge?.menu_order,
     onOptimisticUpdate: handleMenuOrderOptimisticUpdate,
     onPersist: handleMenuOrderPersist,
@@ -207,7 +226,7 @@ const Layout = () => {
 
   const customTitlebar = useMemo(
     () =>
-      !decorated ? (
+      shouldShowAppShell && !decorated ? (
         <div className="the_titlebar">
           <div
             className="the_titlebar-drag-region"
@@ -216,7 +235,7 @@ const Layout = () => {
           <WindowControls ref={windowControlsRef} />
         </div>
       ) : null,
-    [decorated],
+    [decorated, shouldShowAppShell],
   )
 
   useLoadingOverlay(themeReady)
@@ -234,6 +253,52 @@ const Layout = () => {
   )
 
   useLayoutEvents(handleNotice)
+
+  useEffect(() => {
+    if (booting || !isTauriRuntime()) return
+
+    const nextMode = session ? 'app' : 'auth'
+    if (lastWindowModeRef.current === nextMode) return
+    lastWindowModeRef.current = nextMode
+
+    const applyWindowMode = async () => {
+      try {
+        if (nextMode === 'auth') {
+          if (await currentWindow.isMaximized()) {
+            await currentWindow.unmaximize()
+          }
+          if (await currentWindow.isFullscreen()) {
+            await currentWindow.setFullscreen(false)
+          }
+          await currentWindow.setDecorations(false)
+          await currentWindow.setShadow(false).catch(() => undefined)
+          await currentWindow.setResizable(false)
+          await currentWindow.setMinSize(AUTH_WINDOW_MIN_SIZE)
+          await currentWindow.setSize(AUTH_WINDOW_SIZE)
+          await currentWindow.center()
+        } else {
+          await currentWindow.setShadow(true).catch(() => undefined)
+          await currentWindow.setDecorations(true)
+          await currentWindow.setResizable(true)
+          await currentWindow.setMinSize(APP_WINDOW_MIN_SIZE)
+          await currentWindow.setSize(APP_WINDOW_SIZE)
+          await currentWindow.center()
+        }
+
+        await refreshDecorated()
+      } catch (error) {
+        console.warn('[Layout] failed to apply window mode:', error)
+      }
+    }
+
+    void applyWindowMode()
+  }, [booting, currentWindow, refreshDecorated, session])
+
+  useEffect(() => {
+    if (!booting && !session && pathname !== '/') {
+      navigate('/', { replace: true })
+    }
+  }, [booting, navigate, pathname, session])
 
   useEffect(() => {
     if (language) {
@@ -263,6 +328,8 @@ const Layout = () => {
     <ThemeProvider theme={theme}>
       {/* 左侧底部窗口控制按钮 */}
       <NoticeManager position={verge?.notice_position} />
+      <CrispSupport />
+      <XboardAnnouncementDialog />
       <div
         style={{
           animation: 'fadeIn 0.5s',
@@ -310,144 +377,150 @@ const Layout = () => {
         {/* Custom titlebar - rendered only when decorated is false, memoized for performance */}
         {customTitlebar}
 
-        <div className="layout-content">
-          <div className="layout-content__left">
-            <div className="the-logo" data-tauri-drag-region="false">
-              <div
-                data-tauri-drag-region="true"
-                style={{
-                  height: '27px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
+        <div
+          className={`layout-content${shouldShowAppShell ? '' : ' layout-content--auth'}`}
+        >
+          {shouldShowAppShell && (
+            <div className="layout-content__left">
+              <div className="the-logo" data-tauri-drag-region="false">
+                <div
+                  data-tauri-drag-region="true"
+                  style={{
+                    minHeight: '44px',
+                    minWidth: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-start',
+                  }}
+                >
+                  <img src={brandLogo} alt="" className="brand-logo" />
+                  <div className="brand-text">
+                    <span>{remote.remoteConfig.APP_NAME}</span>
+                    <small>Native Control</small>
+                  </div>
+                </div>
+                <UpdateButton className="the-newbtn" />
+              </div>
+
+              {menuUnlocked && (
+                <Box
+                  sx={(theme) => ({
+                    px: 1.5,
+                    py: 0.75,
+                    mx: 'auto',
+                    mb: 1,
+                    maxWidth: 250,
+                    borderRadius: 1.5,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    textAlign: 'center',
+                    color: theme.palette.warning.contrastText,
+                    bgcolor:
+                      theme.palette.mode === 'light'
+                        ? theme.palette.warning.main
+                        : theme.palette.warning.dark,
+                  })}
+                >
+                  {t('layout.components.navigation.menu.reorderMode')}
+                </Box>
+              )}
+
+              {menuUnlocked ? (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleMenuDragEnd}
+                >
+                  <SortableContext items={menuOrder}>
+                    <List
+                      className="the-menu"
+                      onContextMenu={handleMenuContextMenu}
+                    >
+                      {menuOrder.map((path) => {
+                        const item = navItemMap.get(path)
+                        if (!item) {
+                          return null
+                        }
+                        return (
+                          <SortableNavMenuItem
+                            key={item.path}
+                            item={item}
+                            label={resolveNavLabel(item.label)}
+                          />
+                        )
+                      })}
+                    </List>
+                  </SortableContext>
+                </DndContext>
+              ) : (
+                <List
+                  className="the-menu"
+                  onContextMenu={handleMenuContextMenu}
+                >
+                  {menuOrder.map((path) => {
+                    const item = navItemMap.get(path)
+                    if (!item) {
+                      return null
+                    }
+                    return (
+                      <LayoutItem
+                        key={item.path}
+                        to={item.path}
+                        icon={item.icon}
+                      >
+                        {resolveNavLabel(item.label)}
+                      </LayoutItem>
+                    )
+                  })}
+                </List>
+              )}
+
+              <Menu
+                open={Boolean(menuContextPosition)}
+                onClose={handleMenuContextClose}
+                anchorReference="anchorPosition"
+                anchorPosition={
+                  menuContextPosition
+                    ? {
+                        top: menuContextPosition.top,
+                        left: menuContextPosition.left,
+                      }
+                    : undefined
+                }
+                transitionDuration={200}
+                slotProps={{
+                  list: {
+                    sx: { py: 0.5 },
+                  },
                 }}
               >
-                <SvgIcon
-                  component={isDark ? iconDark : iconLight}
-                  style={{
-                    height: '36px',
-                    width: '36px',
-                    marginTop: '-3px',
-                    marginRight: '5px',
-                    marginLeft: '-3px',
-                  }}
-                  inheritViewBox
-                />
-                <LogoSvg fill={isDark ? 'white' : 'black'} />
+                <MenuItem onClick={handleToggleNavCollapsed} dense>
+                  {navCollapsed
+                    ? t('layout.components.navigation.menu.expandNavBar')
+                    : t('layout.components.navigation.menu.collapseNavBar')}
+                </MenuItem>
+                <MenuItem
+                  onClick={menuUnlocked ? handleLockMenu : handleUnlockMenu}
+                  dense
+                >
+                  {menuUnlocked
+                    ? t('layout.components.navigation.menu.lock')
+                    : t('layout.components.navigation.menu.unlock')}
+                </MenuItem>
+                <MenuItem
+                  onClick={handleResetMenuOrder}
+                  dense
+                  disabled={isDefaultOrder}
+                >
+                  {t('layout.components.navigation.menu.restoreDefaultOrder')}
+                </MenuItem>
+              </Menu>
+
+              <div className="the-traffic">
+                <LayoutTraffic />
               </div>
-              <UpdateButton className="the-newbtn" />
             </div>
-
-            {menuUnlocked && (
-              <Box
-                sx={(theme) => ({
-                  px: 1.5,
-                  py: 0.75,
-                  mx: 'auto',
-                  mb: 1,
-                  maxWidth: 250,
-                  borderRadius: 1.5,
-                  fontSize: 12,
-                  fontWeight: 600,
-                  textAlign: 'center',
-                  color: theme.palette.warning.contrastText,
-                  bgcolor:
-                    theme.palette.mode === 'light'
-                      ? theme.palette.warning.main
-                      : theme.palette.warning.dark,
-                })}
-              >
-                {t('layout.components.navigation.menu.reorderMode')}
-              </Box>
-            )}
-
-            {menuUnlocked ? (
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleMenuDragEnd}
-              >
-                <SortableContext items={menuOrder}>
-                  <List
-                    className="the-menu"
-                    onContextMenu={handleMenuContextMenu}
-                  >
-                    {menuOrder.map((path) => {
-                      const item = navItemMap.get(path)
-                      if (!item) {
-                        return null
-                      }
-                      return (
-                        <SortableNavMenuItem
-                          key={item.path}
-                          item={item}
-                          label={t(item.label)}
-                        />
-                      )
-                    })}
-                  </List>
-                </SortableContext>
-              </DndContext>
-            ) : (
-              <List className="the-menu" onContextMenu={handleMenuContextMenu}>
-                {menuOrder.map((path) => {
-                  const item = navItemMap.get(path)
-                  if (!item) {
-                    return null
-                  }
-                  return (
-                    <LayoutItem key={item.path} to={item.path} icon={item.icon}>
-                      {t(item.label)}
-                    </LayoutItem>
-                  )
-                })}
-              </List>
-            )}
-
-            <Menu
-              open={Boolean(menuContextPosition)}
-              onClose={handleMenuContextClose}
-              anchorReference="anchorPosition"
-              anchorPosition={
-                menuContextPosition
-                  ? {
-                      top: menuContextPosition.top,
-                      left: menuContextPosition.left,
-                    }
-                  : undefined
-              }
-              transitionDuration={200}
-              slotProps={{
-                list: {
-                  sx: { py: 0.5 },
-                },
-              }}
-            >
-              <MenuItem onClick={handleToggleNavCollapsed} dense>
-                {navCollapsed
-                  ? t('layout.components.navigation.menu.expandNavBar')
-                  : t('layout.components.navigation.menu.collapseNavBar')}
-              </MenuItem>
-              <MenuItem
-                onClick={menuUnlocked ? handleLockMenu : handleUnlockMenu}
-                dense
-              >
-                {menuUnlocked
-                  ? t('layout.components.navigation.menu.lock')
-                  : t('layout.components.navigation.menu.unlock')}
-              </MenuItem>
-              <MenuItem
-                onClick={handleResetMenuOrder}
-                dense
-                disabled={isDefaultOrder}
-              >
-                {t('layout.components.navigation.menu.restoreDefaultOrder')}
-              </MenuItem>
-            </Menu>
-
-            <div className="the-traffic">
-              <LayoutTraffic />
-            </div>
-          </div>
+          )}
 
           <div className="layout-content__right">
             <div className="the-bar"></div>
@@ -455,20 +528,6 @@ const Layout = () => {
               <BaseErrorBoundary>
                 <Outlet />
               </BaseErrorBoundary>
-              {logsPageMountedRef.current && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    display: isLogsPage ? undefined : 'none',
-                  }}
-                >
-                  <LogsPage />
-                </div>
-              )}
             </div>
           </div>
         </div>

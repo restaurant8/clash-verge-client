@@ -985,7 +985,7 @@ const AuthPanel = () => {
         pt: { xs: 4, sm: 5 },
         px: { xs: 2, md: 3 },
         pb: 2,
-        bgcolor: '#fff',
+        bgcolor: 'background.paper',
         boxSizing: 'border-box',
         overflowY: 'auto',
         position: 'relative',
@@ -1284,7 +1284,7 @@ const ConnectPage = () => {
           height: '100%',
           display: 'grid',
           placeItems: 'center',
-          bgcolor: '#fff',
+          bgcolor: 'background.paper',
         }}
         data-tauri-drag-region="true"
       >

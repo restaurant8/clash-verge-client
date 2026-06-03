@@ -393,7 +393,7 @@ const TicketsPage = () => {
                               : theme.palette.divider,
                             bgcolor: selected
                               ? alpha(theme.palette.primary.main, 0.07)
-                              : '#fff',
+                              : theme.palette.background.paper,
                             cursor: 'pointer',
                             transition:
                               'border-color .16s ease, background-color .16s ease',
@@ -531,7 +531,7 @@ const TicketsPage = () => {
                               p: 1.5,
                               borderRadius: 1,
                               bgcolor: fromAdmin
-                                ? '#fff'
+                                ? theme.palette.background.paper
                                 : alpha(theme.palette.primary.main, 0.08),
                               border: '1px solid',
                               borderColor: fromAdmin

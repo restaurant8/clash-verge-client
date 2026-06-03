@@ -20,7 +20,7 @@ export const XboardPage = ({
         height: '100%',
         overflow: 'auto',
         p: 2.25,
-        bgcolor: '#f3f5f4',
+        bgcolor: 'var(--page-background-color)',
       }}
     >
       <Stack

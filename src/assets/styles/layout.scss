@@ -10,10 +10,10 @@
     display: flex;
     flex: 1; /* Take remaining height */
     overflow: hidden;
-    background: #f8fbf9;
+    background: var(--layout-background-color);
 
     &--auth {
-      background: #fff;
+      background: var(--surface-color);
 
       .layout-content__right {
         right: 0;
@@ -45,7 +45,7 @@
       -ms-user-select: none;
       overflow: hidden;
       border-right: 1px solid var(--divider-color);
-      background: #fff;
+      background: var(--surface-color);
 
       .the-logo {
         position: relative;

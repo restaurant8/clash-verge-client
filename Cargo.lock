@@ -4289,7 +4289,7 @@ dependencies = [
 
 [[package]]
 name = "muacloud-client"
-version = "2.5.1"
+version = "2.5.2"
 dependencies = [
  "aes-gcm",
  "anyhow",

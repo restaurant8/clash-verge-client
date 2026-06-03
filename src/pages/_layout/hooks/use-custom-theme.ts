@@ -217,8 +217,31 @@ export const useCustomTheme = () => {
       const scrollColor = mode === 'light' ? '#90939980' : '#555555'
       const dividerColor =
         mode === 'light' ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.06)'
+      const layoutBackgroundColor = mode === 'light' ? '#f8fbf9' : '#1E1F27'
+      const pageBackgroundColor = mode === 'light' ? '#f3f5f4' : '#1E1F27'
+      const surfaceColor = mode === 'light' ? '#ffffff' : dt.background_color
+      const panelBorderColor =
+        mode === 'light' ? '#dfe5e2' : 'rgba(255, 255, 255, 0.1)'
+      const emptyBorderColor =
+        mode === 'light' ? '#d8e0dc' : 'rgba(255, 255, 255, 0.16)'
+      const panelShadow =
+        mode === 'light' ? '0 1px 2px rgba(15, 23, 42, 0.03)' : 'none'
+      rootEle.setAttribute('data-theme', mode)
+      rootEle.style.setProperty('color-scheme', mode)
       rootEle.style.setProperty('--divider-color', dividerColor)
       rootEle.style.setProperty('--background-color', backgroundColor)
+      rootEle.style.setProperty('--bg-color', backgroundColor)
+      rootEle.style.setProperty('--text-color', muiTheme.palette.text.primary)
+      rootEle.style.setProperty('--text-primary', muiTheme.palette.text.primary)
+      rootEle.style.setProperty(
+        '--layout-background-color',
+        layoutBackgroundColor,
+      )
+      rootEle.style.setProperty('--page-background-color', pageBackgroundColor)
+      rootEle.style.setProperty('--surface-color', surfaceColor)
+      rootEle.style.setProperty('--panel-border-color', panelBorderColor)
+      rootEle.style.setProperty('--empty-border-color', emptyBorderColor)
+      rootEle.style.setProperty('--panel-shadow', panelShadow)
       rootEle.style.setProperty('--selection-color', selectColor)
       rootEle.style.setProperty('--scroller-color', scrollColor)
       rootEle.style.setProperty('--primary-main', muiTheme.palette.primary.main)
@@ -286,6 +309,7 @@ export const useCustomTheme = () => {
         /* 背景图处理 */
         body {
           background-color: var(--background-color);
+          color: ${muiTheme.palette.text.primary};
           ${
             hasUserBackground
               ? `

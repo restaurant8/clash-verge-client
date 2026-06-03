@@ -140,7 +140,7 @@ export const XboardAnnouncementDialog = () => {
   return (
     <Dialog open={open} fullWidth maxWidth="sm" onClose={closeDialog}>
       <DialogTitle sx={{ fontWeight: 900 }}>公告</DialogTitle>
-      <DialogContent dividers sx={{ bgcolor: '#fff' }}>
+      <DialogContent dividers sx={{ bgcolor: 'background.paper' }}>
         <Stack spacing={1.5}>
           {announcementItems.map((notice, index) => (
             <Box key={notice.key}>

@@ -25,10 +25,10 @@ export const XboardPanel = ({ title, action, children, sx }: PanelProps) => (
       {
         p: 2,
         border: '1px solid',
-        borderColor: '#dfe5e2',
+        borderColor: 'var(--panel-border-color)',
         borderRadius: 1,
-        bgcolor: '#fff',
-        boxShadow: '0 1px 2px rgba(15, 23, 42, 0.03)',
+        bgcolor: 'var(--surface-color)',
+        boxShadow: 'var(--panel-shadow)',
       },
       ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
     ]}
@@ -74,10 +74,10 @@ export const XboardMetric = ({
         minHeight: 86,
         p: 1.5,
         borderRadius: 1,
-        bgcolor: '#fff',
+        bgcolor: 'var(--surface-color)',
         border: '1px solid',
-        borderColor: '#dfe5e2',
-        boxShadow: '0 1px 2px rgba(15, 23, 42, 0.03)',
+        borderColor: 'var(--panel-border-color)',
+        boxShadow: 'var(--panel-shadow)',
       },
       ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
     ]}
@@ -136,9 +136,9 @@ export const XboardEmpty = ({
       textAlign: 'center',
       p: 3,
       border: '1px dashed',
-      borderColor: '#d8e0dc',
+      borderColor: 'var(--empty-border-color)',
       borderRadius: 1,
-      bgcolor: '#fff',
+      bgcolor: 'var(--surface-color)',
     }}
   >
     <Stack spacing={1.2} sx={{ alignItems: 'center' }}>

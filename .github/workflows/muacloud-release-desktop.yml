@@ -81,7 +81,7 @@ jobs:
 
           PRERELEASE="${{ (github.event_name == 'workflow_dispatch' && inputs.prerelease) || contains(github.ref_name, '-rc') }}"
           SIGN_UPDATES="${{ github.event_name == 'workflow_dispatch' && inputs.sign_updates }}"
-          TELEGRAM_UPLOAD="${{ (github.event_name == 'workflow_dispatch' && inputs.telegram_upload) || github.event_name == 'push' }}"
+          TELEGRAM_UPLOAD="${{ github.event_name == 'workflow_dispatch' && inputs.telegram_upload }}"
 
           if [ "$SIGN_UPDATES" = "true" ]; then
             SIGN_ARGS=""

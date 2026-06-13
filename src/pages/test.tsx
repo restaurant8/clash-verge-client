@@ -146,7 +146,7 @@ const TestPage = () => {
           <Button
             variant="contained"
             size="small"
-            onClick={() => emit('verge://test-all')}
+            onClick={() => emit('muacloud://test-all')}
           >
             {t('tests.page.actions.testAll')}
           </Button>

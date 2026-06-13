@@ -1,22 +1,21 @@
-<h1 align="center">
-  <img src="./src-tauri/icons/icon.png" alt="Clash" width="128" />
-  <br>
-  Continuation of <a href="https://github.com/zzzgydi/clash-verge">Clash Verge</a>
-  <br>
-</h1>
+# MuaCloud Client
 
-<h3 align="center">
-A Clash Meta GUI based on <a href="https://github.com/tauri-apps/tauri">Tauri</a>.
-</h3>
+MuaCloud desktop client for Windows and macOS, built with Tauri, React, TypeScript, Rust, and Mihomo-compatible local proxy support.
 
-<p align="center">
-  Languages:
-  <a href="./README.md">简体中文</a> ·
-  <a href="./docs/README_en.md">English</a> ·
-  <a href="./docs/README_es.md">Español</a> ·
-  <a href="./docs/README_ru.md">Русский</a> ·
-  <a href="./docs/README_ja.md">日本語</a> ·
-  <a href="./docs/README_ko.md">한국어</a> ·
-  <a href="./docs/README_fa.md">فارسی</a>
-</p>
+## Development
 
+Read `docs/CLIENT_CONTRACT.md` before changing startup, authentication, subscription, checkout, entitlement, API failover, or remote configuration behavior.
+
+Useful local commands:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm run web:build
+pnpm tauri build
+```
+
+## Release
+
+The project release workflow is `.github/workflows/muacloud-release-desktop.yml`.
+
+It builds Windows and macOS desktop artifacts and uploads them to a GitHub draft Release. Optional Telegram upload support is intentionally disabled by default.

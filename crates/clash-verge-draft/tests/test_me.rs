@@ -7,7 +7,7 @@ mod tests {
     use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
     #[derive(Clone, Debug, Default, PartialEq)]
-    struct IVerge {
+    struct IAppConfig {
         enable_auto_launch: Option<bool>,
         enable_tun_mode: Option<bool>,
     }
@@ -38,7 +38,7 @@ mod tests {
 
     #[test]
     fn test_draft_basic_flow() {
-        let verge = IVerge {
+        let verge = IAppConfig {
             enable_auto_launch: Some(true),
             enable_tun_mode: Some(false),
         };
@@ -111,7 +111,7 @@ mod tests {
 
     #[test]
     fn test_arc_pointer_behavior_on_edit_and_apply() {
-        let draft = Draft::new(IVerge {
+        let draft = Draft::new(IAppConfig {
             enable_auto_launch: Some(true),
             enable_tun_mode: Some(false),
         });
@@ -154,7 +154,7 @@ mod tests {
 
     #[test]
     fn test_discard_restores_latest_to_committed() {
-        let draft = Draft::new(IVerge {
+        let draft = Draft::new(IAppConfig {
             enable_auto_launch: Some(false),
             enable_tun_mode: Some(false),
         });
@@ -175,7 +175,7 @@ mod tests {
 
     #[test]
     fn test_edit_draft_returns_closure_result() {
-        let draft = Draft::new(IVerge::default());
+        let draft = Draft::new(IAppConfig::default());
         let ret = draft.edit_draft(|d| {
             d.enable_tun_mode = Some(true);
             123usize
@@ -187,7 +187,7 @@ mod tests {
 
     #[test]
     fn test_with_data_modify_ok_and_replaces_committed() {
-        let draft = Draft::new(IVerge {
+        let draft = Draft::new(IAppConfig {
             enable_auto_launch: Some(false),
             enable_tun_mode: Some(false),
         });
@@ -212,18 +212,19 @@ mod tests {
 
     #[test]
     fn test_with_data_modify_error_propagation() {
-        let draft = Draft::new(IVerge::default());
+        let draft = Draft::new(IAppConfig::default());
 
         #[allow(clippy::unwrap_used)]
-        let err = block_on_ready(draft.with_data_modify(|_v| async move { Err::<(IVerge, ()), _>(anyhow!("boom")) }))
-            .unwrap_err();
+        let err =
+            block_on_ready(draft.with_data_modify(|_v| async move { Err::<(IAppConfig, ()), _>(anyhow!("boom")) }))
+                .unwrap_err();
 
         assert_eq!(format!("{err}"), "boom");
     }
 
     #[test]
     fn test_with_data_modify_does_not_touch_existing_draft() {
-        let draft = Draft::new(IVerge {
+        let draft = Draft::new(IAppConfig {
             enable_auto_launch: Some(false),
             enable_tun_mode: Some(false),
         });

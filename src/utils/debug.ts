@@ -2,8 +2,8 @@
  * Debug logging is enabled when:
  * - dev build (`import.meta.env.DEV`)
  * - env flag `VITE_ENABLE_DEBUG_LOGS` is truthy (1/true/yes)
- * - page sets `window.__VERGE_ENABLE_DEBUG_LOGS__ = true`
- * - localStorage item `VERGE_DEBUG_LOGS` is truthy (1/true/yes)
+ * - page sets `window.__MUACLOUD_ENABLE_DEBUG_LOGS__ = true`
+ * - localStorage item `MUACLOUD_DEBUG_LOGS` is truthy (1/true/yes)
  * Use `setDebugLoggingEnabled` to force-enable/disable at runtime.
  */
 let runtimeOverride: boolean | undefined
@@ -19,14 +19,14 @@ const parseStringFlag = (value: unknown) => {
 
 const readGlobalFlag = (): boolean | null => {
   if (typeof window === 'undefined') return null
-  const flag = (window as any).__VERGE_ENABLE_DEBUG_LOGS__
+  const flag = (window as any).__MUACLOUD_ENABLE_DEBUG_LOGS__
   return typeof flag === 'boolean' ? flag : null
 }
 
 const readStoredFlag = (): boolean | null => {
   if (typeof window === 'undefined') return null
   try {
-    const stored = window.localStorage?.getItem('VERGE_DEBUG_LOGS')
+    const stored = window.localStorage?.getItem('MUACLOUD_DEBUG_LOGS')
     return stored ? parseStringFlag(stored) : null
   } catch {
     return null

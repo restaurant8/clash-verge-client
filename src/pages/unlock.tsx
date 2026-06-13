@@ -34,8 +34,10 @@ interface UnlockItem {
   check_time?: string | null
 }
 
-const UNLOCK_RESULTS_STORAGE_KEY = 'clash_verge_unlock_results'
-const UNLOCK_RESULTS_TIME_KEY = 'clash_verge_unlock_time'
+const UNLOCK_RESULTS_STORAGE_KEY = 'muacloud_unlock_results'
+const UNLOCK_RESULTS_TIME_KEY = 'muacloud_unlock_time'
+const LEGACY_UNLOCK_RESULTS_STORAGE_KEY = 'clash_verge_unlock_results'
+const LEGACY_UNLOCK_RESULTS_TIME_KEY = 'clash_verge_unlock_time'
 
 const STATUS_LABEL_KEYS: Record<string, string> = {
   Pending: 'tests.statuses.test.pending',
@@ -148,6 +150,8 @@ const UnlockPage = () => {
         if (time) {
           localStorage.setItem(UNLOCK_RESULTS_TIME_KEY, time)
         }
+        localStorage.removeItem(LEGACY_UNLOCK_RESULTS_STORAGE_KEY)
+        localStorage.removeItem(LEGACY_UNLOCK_RESULTS_TIME_KEY)
       } catch (err) {
         console.error('Failed to save results to storage:', err)
       }
@@ -160,8 +164,26 @@ const UnlockPage = () => {
     time: string | null
   } => {
     try {
-      const itemsJson = localStorage.getItem(UNLOCK_RESULTS_STORAGE_KEY)
-      const time = localStorage.getItem(UNLOCK_RESULTS_TIME_KEY)
+      let itemsJson = localStorage.getItem(UNLOCK_RESULTS_STORAGE_KEY)
+      let time = localStorage.getItem(UNLOCK_RESULTS_TIME_KEY)
+
+      if (!itemsJson) {
+        const legacyItemsJson = localStorage.getItem(
+          LEGACY_UNLOCK_RESULTS_STORAGE_KEY,
+        )
+        const legacyTime = localStorage.getItem(LEGACY_UNLOCK_RESULTS_TIME_KEY)
+
+        if (legacyItemsJson) {
+          itemsJson = legacyItemsJson
+          time = time ?? legacyTime
+          localStorage.setItem(UNLOCK_RESULTS_STORAGE_KEY, legacyItemsJson)
+          if (legacyTime) {
+            localStorage.setItem(UNLOCK_RESULTS_TIME_KEY, legacyTime)
+          }
+          localStorage.removeItem(LEGACY_UNLOCK_RESULTS_STORAGE_KEY)
+          localStorage.removeItem(LEGACY_UNLOCK_RESULTS_TIME_KEY)
+        }
+      }
 
       if (itemsJson) {
         const parsedItems = JSON.parse(itemsJson) as UnlockItem[]

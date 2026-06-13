@@ -205,7 +205,7 @@ export const ProfileItem = (props: Props) => {
     let disposed = false
     let unlistenTimerUpdate: (() => void) | undefined
 
-    listen<string>('verge://timer-updated', ({ payload: updatedUid }) => {
+    listen<string>('muacloud://timer-updated', ({ payload: updatedUid }) => {
       // 只有当更新的是当前配置时才刷新显示
       if (updatedUid === itemData.uid && showNextUpdateRef.current) {
         debugLog(`收到定时器更新事件: uid=${updatedUid}`)

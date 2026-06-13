@@ -1,9 +1,20 @@
-import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 
 import { stopCore } from '@/services/cmds'
 import { setDelayDisplayScale } from '@/services/delay'
 import { showNotice } from '@/services/notice-service'
-import { XboardApiClient } from '@/services/xboard/api'
+import {
+  XBOARD_AUTH_EXPIRED_EVENT,
+  XboardApiClient,
+  isXboardAuthExpiredError,
+} from '@/services/xboard/api'
 import {
   getCachedXboardConfig,
   resolveXboardRemoteConfig,
@@ -70,6 +81,11 @@ const buildClient = (remote: XboardResolvedConfig) =>
     remote.apiDomains,
   )
 
+const fallbackUnlessAuthExpired = <T,>(error: unknown, fallback: T) => {
+  if (isXboardAuthExpiredError(error)) throw error
+  return fallback
+}
+
 const loadAccountSnapshot = async (
   client: XboardApiClient,
   session: XboardSession,
@@ -77,8 +93,12 @@ const loadAccountSnapshot = async (
   await client.checkLogin(session.authData)
 
   const [userInfo, subscribeInfo] = await Promise.all([
-    client.userInfo(session.authData).catch((error) => ({ error })),
-    client.getSubscribe(session.authData).catch((error) => ({ error })),
+    client
+      .userInfo(session.authData)
+      .catch((error) => fallbackUnlessAuthExpired(error, { error })),
+    client
+      .getSubscribe(session.authData)
+      .catch((error) => fallbackUnlessAuthExpired(error, { error })),
   ])
 
   const subscribeToken = extractSubscribeToken(
@@ -93,11 +113,15 @@ const loadAccountSnapshot = async (
   }
 
   const [serverPayload, appConfig, noticePayload] = await Promise.all([
-    client.fetchServers(session.authData).catch(() => []),
+    client
+      .fetchServers(session.authData)
+      .catch((error) => fallbackUnlessAuthExpired(error, [])),
     subscribeToken
       ? client.appConfig(subscribeToken).catch(() => undefined)
       : undefined,
-    client.notices(session.authData).catch(() => []),
+    client
+      .notices(session.authData)
+      .catch((error) => fallbackUnlessAuthExpired(error, [])),
   ])
 
   return {
@@ -152,6 +176,7 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
   const [connection, setConnection] = useState<XboardConnectionState>({
     status: 'disconnected',
   })
+  const lastAuthExpiredNoticeAtRef = useRef(0)
 
   const client = useMemo(() => buildClient(remote), [remote])
 
@@ -216,6 +241,49 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
     clearResourceCache()
   }, [clearResourceCache])
 
+  const notifyAuthExpired = useCallback((message: string) => {
+    const now = Date.now()
+    if (now - lastAuthExpiredNoticeAtRef.current < 1000) return
+    lastAuthExpiredNoticeAtRef.current = now
+    showNotice.error(`登录状态已失效，请重新登录：${message}`)
+  }, [])
+
+  const handleAuthExpired = useCallback(
+    (error: unknown) => {
+      if (!isXboardAuthExpiredError(error)) return false
+      const message = error.message || '登录状态已失效，请重新登录'
+      setLastError(message)
+      setConnection({ status: 'disconnected' })
+      logout()
+      notifyAuthExpired(message)
+      return true
+    },
+    [logout, notifyAuthExpired],
+  )
+
+  useEffect(() => {
+    const handleEvent = (event: Event) => {
+      const detail =
+        event instanceof CustomEvent && typeof event.detail === 'object'
+          ? event.detail
+          : undefined
+      const message =
+        typeof detail?.message === 'string' && detail.message
+          ? detail.message
+          : '登录状态已失效，请重新登录'
+
+      setLastError(message)
+      setConnection({ status: 'disconnected' })
+      logout()
+      notifyAuthExpired(message)
+    }
+
+    window.addEventListener(XBOARD_AUTH_EXPIRED_EVENT, handleEvent)
+    return () => {
+      window.removeEventListener(XBOARD_AUTH_EXPIRED_EVENT, handleEvent)
+    }
+  }, [logout, notifyAuthExpired])
+
   const refreshAccount = useCallback(async () => {
     if (!session) return
     setRefreshing(true)
@@ -225,14 +293,20 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
       applySnapshot(snapshot)
       await syncSubscriptionProfile(snapshot, { noticeErrors: true })
     } catch (error) {
+      if (handleAuthExpired(error)) return
       const message = error instanceof Error ? error.message : String(error)
       setLastError(message)
-      logout()
-      showNotice.error(`登录状态失效：${message}`)
+      showNotice.error(`账号刷新失败：${message}`)
     } finally {
       setRefreshing(false)
     }
-  }, [applySnapshot, client, logout, session, syncSubscriptionProfile])
+  }, [
+    applySnapshot,
+    client,
+    handleAuthExpired,
+    session,
+    syncSubscriptionProfile,
+  ])
 
   const loadPlans = useCallback(
     async (force = false) => {
@@ -241,7 +315,9 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
 
       const [planPayload, paymentPayload] = await Promise.all([
         client.plans(session.authData),
-        client.paymentMethods(session.authData).catch(() => []),
+        client
+          .paymentMethods(session.authData)
+          .catch((error) => fallbackUnlessAuthExpired(error, [])),
       ])
 
       setResourceCache((prev) => ({
@@ -435,6 +511,7 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
       })
       showNotice.success('连接已启动')
     } catch (error) {
+      if (handleAuthExpired(error)) throw error
       const message = error instanceof Error ? error.message : String(error)
       setConnection({ status: 'error', message })
       setLastError(message)
@@ -443,7 +520,7 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setRefreshing(false)
     }
-  }, [applySnapshot, client, remote.remoteConfig, session])
+  }, [applySnapshot, client, handleAuthExpired, remote.remoteConfig, session])
 
   const disconnect = useCallback(async () => {
     await stopCore()
@@ -477,6 +554,7 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
           }
         }
       } catch (error) {
+        if (!cancelled && handleAuthExpired(error)) return
         const message = error instanceof Error ? error.message : String(error)
         if (!cancelled) setLastError(message)
       } finally {
@@ -489,7 +567,7 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       cancelled = true
     }
-  }, [applySnapshot, refreshRemoteConfig])
+  }, [applySnapshot, handleAuthExpired, refreshRemoteConfig])
 
   const value = useMemo(
     () => ({

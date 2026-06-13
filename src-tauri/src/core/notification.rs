@@ -32,13 +32,13 @@ impl NotificationSystem {
 
     fn serialize_event(event: FrontendEvent) -> (&'static str, Result<serde_json::Value, serde_json::Error>) {
         match event {
-            FrontendEvent::RefreshClash => ("verge://refresh-clash-config", Ok(json!("yes"))),
-            FrontendEvent::RefreshVerge => ("verge://refresh-verge-config", Ok(json!("yes"))),
+            FrontendEvent::RefreshClash => ("muacloud://refresh-clash-config", Ok(json!("yes"))),
+            FrontendEvent::RefreshVerge => ("muacloud://refresh-verge-config", Ok(json!("yes"))),
             FrontendEvent::NoticeMessage { status, message } => {
-                ("verge://notice-message", serde_json::to_value((status, message)))
+                ("muacloud://notice-message", serde_json::to_value((status, message)))
             }
             FrontendEvent::ProfileChanged { current_profile_id } => ("profile-changed", Ok(json!(current_profile_id))),
-            FrontendEvent::TimerUpdated { profile_index } => ("verge://timer-updated", Ok(json!(profile_index))),
+            FrontendEvent::TimerUpdated { profile_index } => ("muacloud://timer-updated", Ok(json!(profile_index))),
             FrontendEvent::ProfileUpdateStarted { uid } => ("profile-update-started", Ok(json!({ "uid": uid }))),
             FrontendEvent::ProfileUpdateCompleted { uid } => ("profile-update-completed", Ok(json!({ "uid": uid }))),
         }

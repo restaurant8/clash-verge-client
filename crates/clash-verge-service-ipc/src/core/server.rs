@@ -217,7 +217,6 @@ async fn make_ipc_dir() -> Result<()> {
             }
         }
 
-        // See issues in https://github.com/clash-verge-rev/clash-verge-rev/issues/6149
         // Apply the SetGID bit (0o2000) to ensure the IPC socket inherits the directory's group ID.
         // The mode is set to 0o2770 (rwxrws---) to permit the designated user group (e.g., staff
         // on macOS or the primary group on Linux) to manage the socket's lifecycle. This prevents

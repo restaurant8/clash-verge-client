@@ -81,7 +81,7 @@ export const TestItem = ({
       if (unlistenFn) {
         unlistenFn()
       }
-      unlistenFn = await addListener('verge://test-all', () => {
+      unlistenFn = await addListener('muacloud://test-all', () => {
         onDelay()
       })
     }

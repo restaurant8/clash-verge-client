@@ -20,9 +20,9 @@ const getThemeModeFromWindow = (): IVergeConfig['theme_mode'] | undefined => {
   if (typeof window === 'undefined') return undefined
   const mode = (
     window as typeof window & {
-      __VERGE_INITIAL_THEME_MODE?: unknown
+      __MUACLOUD_INITIAL_THEME_MODE?: unknown
     }
-  ).__VERGE_INITIAL_THEME_MODE
+  ).__MUACLOUD_INITIAL_THEME_MODE
   if (mode === 'light' || mode === 'dark' || mode === 'system') {
     return mode
   }
@@ -51,7 +51,7 @@ export const preloadConfig = async () => {
     setPreloadConfig(config)
     return config
   } catch (error) {
-    console.warn('[preload.ts] Failed to read Verge config:', error)
+    console.warn('[preload.ts] Failed to read app config:', error)
     setPreloadConfig(null)
     return null
   }
@@ -73,7 +73,7 @@ export const preloadLanguage = async (
       resolvedConfig = await loadConfig()
     } catch (error) {
       console.warn(
-        '[preload.ts] Failed to read language from Verge config:',
+        '[preload.ts] Failed to read language from app config:',
         error,
       )
       resolvedConfig = null

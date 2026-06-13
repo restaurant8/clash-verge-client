@@ -22,18 +22,18 @@ notifications:
     body: 프로필이 다시 활성화되었습니다.
   appQuit:
     title: 곧 종료
-    body: Clash Verge가 곧 종료됩니다.
+    body: MuaCloud가 곧 종료됩니다.
   appHidden:
     title: 앱이 숨겨짐
-    body: Clash Verge가 백그라운드에서 실행 중입니다.
+    body: MuaCloud가 백그라운드에서 실행 중입니다.
   updateReady:
-    title: Clash Verge Update
+    title: MuaCloud Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Clash Verge 서비스 설치에는 관리자 권한이 필요합니다.
-  adminUninstallPrompt: Clash Verge 서비스 제거에는 관리자 권한이 필요합니다.
+  adminInstallPrompt: MuaCloud 서비스 설치에는 관리자 권한이 필요합니다.
+  adminUninstallPrompt: MuaCloud 서비스 제거에는 관리자 권한이 필요합니다.
 tray:
   dashboard: 대시보드
   ruleMode: 규칙 모드
@@ -58,7 +58,7 @@ tray:
   coreLog: 코어 로그
   restartClash: Clash 코어 재시작
   restartApp: 애플리케이션 재시작
-  vergeVersion: Verge 버전
+  vergeVersion: MuaCloud 버전
   more: 더 보기
   exit: 종료
   tooltip:

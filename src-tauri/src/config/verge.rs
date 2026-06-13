@@ -453,12 +453,12 @@ impl IVerge {
         }
     }
 
-    /// Save IVerge App Config
+    /// Save app config
     pub async fn save_file(&self) -> Result<()> {
         help::save_yaml(&dirs::verge_path()?, &self, Some("# MuaCloud Config")).await
     }
 
-    /// patch verge config
+    /// patch app config
     /// only save to file
     #[allow(clippy::cognitive_complexity)]
     pub fn patch_config(&mut self, patch: &Self) {

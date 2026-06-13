@@ -1,5 +1,5 @@
 {
-  "name": "Clash Verge Rev Development Environment",
+  "name": "MuaCloud Development Environment",
   "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
 
   "features": {
@@ -68,15 +68,15 @@
       "onAutoForward": "notify"
     },
     "7890": {
-      "label": "Clash HTTP Proxy",
+      "label": "Mihomo HTTP Proxy",
       "onAutoForward": "silent"
     },
     "7891": {
-      "label": "Clash SOCKS Proxy",
+      "label": "Mihomo SOCKS Proxy",
       "onAutoForward": "silent"
     },
     "9090": {
-      "label": "Clash API",
+      "label": "Mihomo API",
       "onAutoForward": "silent"
     }
   },
@@ -84,9 +84,9 @@
   "postCreateCommand": "bash .devcontainer/post-create.sh",
 
   "mounts": [
-    "source=clash-verge-node-modules,target=${containerWorkspaceFolder}/node_modules,type=volume",
-    "source=clash-verge-cargo-registry,target=/usr/local/cargo/registry,type=volume",
-    "source=clash-verge-cargo-git,target=/usr/local/cargo/git,type=volume"
+    "source=muacloud-node-modules,target=${containerWorkspaceFolder}/node_modules,type=volume",
+    "source=muacloud-cargo-registry,target=/usr/local/cargo/registry,type=volume",
+    "source=muacloud-cargo-git,target=/usr/local/cargo/git,type=volume"
   ],
 
   "containerEnv": {
@@ -96,6 +96,6 @@
   },
 
   "remoteUser": "vscode",
-  "workspaceFolder": "/workspaces/clash-verge-rev",
+  "workspaceFolder": "/workspaces/muacloud-client",
   "shutdownAction": "stopContainer"
 }

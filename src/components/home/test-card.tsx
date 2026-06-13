@@ -168,7 +168,7 @@ export const TestCard = () => {
   )
 
   const handleTestAll = useCallback(() => {
-    emit('verge://test-all')
+    emit('muacloud://test-all')
   }, [])
 
   const handleCreateTest = useCallback(() => {

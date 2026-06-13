@@ -22,18 +22,18 @@ notifications:
     body: Profil diaktifkan kembali.
   appQuit:
     title: Akan Keluar
-    body: Clash Verge akan keluar.
+    body: MuaCloud akan keluar.
   appHidden:
     title: Aplikasi Disembunyikan
-    body: Clash Verge berjalan di latar belakang.
+    body: MuaCloud berjalan di latar belakang.
   updateReady:
-    title: Clash Verge Update
+    title: MuaCloud Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Menginstal layanan Clash Verge memerlukan hak administrator.
-  adminUninstallPrompt: Menghapus instalasi layanan Clash Verge memerlukan hak administrator.
+  adminInstallPrompt: Menginstal layanan MuaCloud memerlukan hak administrator.
+  adminUninstallPrompt: Menghapus instalasi layanan MuaCloud memerlukan hak administrator.
 tray:
   dashboard: Dasbor
   ruleMode: Mode Aturan
@@ -58,7 +58,7 @@ tray:
   coreLog: Log Core
   restartClash: Mulai Ulang Core Clash
   restartApp: Mulai Ulang Aplikasi
-  vergeVersion: Versi Verge
+  vergeVersion: Versi MuaCloud
   more: Lainnya
   exit: Keluar
   tooltip:

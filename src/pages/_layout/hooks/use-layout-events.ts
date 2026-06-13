@@ -42,7 +42,7 @@ export const useLayoutEvents = (
     }
 
     register(
-      addListener('verge://refresh-clash-config', async () => {
+      addListener('muacloud://refresh-clash-config', async () => {
         revalidateKeys([
           'getProxies',
           'getVersion',
@@ -53,7 +53,7 @@ export const useLayoutEvents = (
     )
 
     register(
-      addListener('verge://refresh-verge-config', () => {
+      addListener('muacloud://refresh-verge-config', () => {
         revalidateKeys([
           'getVergeConfig',
           'getSystemProxy',
@@ -66,7 +66,7 @@ export const useLayoutEvents = (
     )
 
     register(
-      addListener('verge://notice-message', ({ payload }) =>
+      addListener('muacloud://notice-message', ({ payload }) =>
         handleNotice(payload as [string, string]),
       ),
     )

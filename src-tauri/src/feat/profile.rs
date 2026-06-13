@@ -25,7 +25,7 @@ pub async fn switch_proxy_node(group_name: &str, proxy_name: &str) {
     {
         Ok(_) => {
             logging!(info, Type::Tray, "切换代理成功: {} -> {}", group_name, proxy_name);
-            let _ = handle::Handle::app_handle().emit("verge://refresh-proxy-config", ());
+            let _ = handle::Handle::app_handle().emit("muacloud://refresh-proxy-config", ());
             let _ = tray::Tray::global().update_menu().await;
             return;
         }

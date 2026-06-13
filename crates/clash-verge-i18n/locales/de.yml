@@ -22,18 +22,18 @@ notifications:
     body: Profil reaktiviert.
   appQuit:
     title: Beenden steht bevor
-    body: Clash Verge wird gleich beendet.
+    body: MuaCloud wird gleich beendet.
   appHidden:
     title: Anwendung ausgeblendet
-    body: Clash Verge läuft im Hintergrund.
+    body: MuaCloud läuft im Hintergrund.
   updateReady:
-    title: Clash Verge Update
+    title: MuaCloud Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Für die Installation des Clash-Verge-Dienstes sind Administratorrechte erforderlich.
-  adminUninstallPrompt: Für die Deinstallation des Clash-Verge-Dienstes sind Administratorrechte erforderlich.
+  adminInstallPrompt: Für die Installation des MuaCloud-Dienstes sind Administratorrechte erforderlich.
+  adminUninstallPrompt: Für die Deinstallation des MuaCloud-Dienstes sind Administratorrechte erforderlich.
 tray:
   dashboard: Übersicht
   ruleMode: Regelmodus
@@ -58,7 +58,7 @@ tray:
   coreLog: Core-Log
   restartClash: Clash-Core neu starten
   restartApp: Anwendung neu starten
-  vergeVersion: Verge-Version
+  vergeVersion: MuaCloud-Version
   more: Mehr
   exit: Beenden
   tooltip:

@@ -49,7 +49,7 @@ bitflags! {
      struct UpdateFlags: u16 {
         const RESTART_CORE = 1 << 0;
         const CLASH_CONFIG = 1 << 1;
-        const VERGE_CONFIG = 1 << 2;
+        const APP_CONFIG = 1 << 2;
         const LAUNCH = 1 << 3;
         const SYS_PROXY = 1 << 4;
         const SYSTRAY_ICON = 1 << 5;
@@ -146,7 +146,7 @@ fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
         update_flags.insert(UpdateFlags::CLASH_CONFIG | UpdateFlags::GROUP_SYS_TRAY);
     }
     if enable_global_hotkey.is_some() || home_cards.is_some() {
-        update_flags.insert(UpdateFlags::VERGE_CONFIG);
+        update_flags.insert(UpdateFlags::APP_CONFIG);
     }
     if auto_launch.is_some() {
         update_flags.insert(UpdateFlags::LAUNCH);
@@ -209,7 +209,7 @@ async fn process_terminated_flags(update_flags: UpdateFlags, patch: &IVerge) -> 
         CoreManager::global().update_config_checked().await?;
         handle::Handle::refresh_clash();
     }
-    if update_flags.contains(UpdateFlags::VERGE_CONFIG) {
+    if update_flags.contains(UpdateFlags::APP_CONFIG) {
         Config::verge()
             .await
             .edit_draft(|d| d.enable_global_hotkey = patch.enable_global_hotkey);
@@ -287,7 +287,7 @@ pub async fn patch_verge(patch: &IVerge, not_save_file: bool) -> Result<()> {
     if !not_save_file {
         // 分离数据获取和异步调用
         let verge_data = Config::verge().await.data_arc();
-        logging!(debug, Type::Setup, "Saving Verge configuration to file...");
+        logging!(debug, Type::Setup, "Saving app configuration to file...");
         verge_data.save_file().await?;
     }
     Ok(())

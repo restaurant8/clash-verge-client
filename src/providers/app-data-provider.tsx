@@ -168,7 +168,7 @@ export const AppDataProvider = ({
 
       try {
         const unlistenProxy = await listen(
-          'verge://refresh-proxy-config',
+          'muacloud://refresh-proxy-config',
           handleRefreshProxy,
         )
         cleanupFns.push(unlistenProxy)

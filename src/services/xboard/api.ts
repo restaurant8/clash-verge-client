@@ -18,6 +18,24 @@ export interface XboardApiResult<T = any> {
   message?: string
 }
 
+export const XBOARD_AUTH_EXPIRED_EVENT = 'xboard:auth-expired'
+
+export class XboardAuthExpiredError extends Error {
+  readonly status?: number
+
+  constructor(message = '登录状态已失效，请重新登录', status?: number) {
+    super(message)
+    this.name = 'XboardAuthExpiredError'
+    this.status = status
+  }
+}
+
+export const isXboardAuthExpiredError = (
+  error: unknown,
+): error is XboardAuthExpiredError =>
+  error instanceof XboardAuthExpiredError ||
+  (error instanceof Error && error.name === 'XboardAuthExpiredError')
+
 const trimSlashes = (value: string) => value.replace(/^\/+|\/+$/g, '')
 
 const joinUrl = (base: string, path: string) => {
@@ -56,6 +74,29 @@ const messageFromPayload = (payload: any, fallback: string) => {
     normalizeMessage(payload?.errors) ||
     fallback
   )
+}
+
+const isAuthExpiredMessage = (message: string) =>
+  /unauthenticated|unauthorized|not\s*login|login\s*expired|invalid\s*token|token\s*(expired|invalid)|未登录|未登入|请先登录|请先登入|登录状态|登录.*(过期|失效)|登入状态|登入.*(過期|失效)|token.*(过期|失效|无效|過期|無效)/i.test(
+    message,
+  )
+
+const emitAuthExpired = (error: XboardAuthExpiredError) => {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(
+    new CustomEvent(XBOARD_AUTH_EXPIRED_EVENT, {
+      detail: {
+        message: error.message,
+        status: error.status,
+      },
+    }),
+  )
+}
+
+const throwAuthExpired = (message: string, status?: number): never => {
+  const error = new XboardAuthExpiredError(message, status)
+  emitAuthExpired(error)
+  throw error
 }
 
 const unwrapResult = (payload: any): XboardApiResult => {
@@ -188,6 +229,13 @@ export class XboardApiClient {
           ),
         )
 
+        if (
+          options.authData &&
+          (response.status === 401 || response.status === 403)
+        ) {
+          throwAuthExpired(error.message, response.status)
+        }
+
         if (canFailover && this.shouldFailoverStatus(response.status)) {
           lastError = error
           continue
@@ -205,6 +253,21 @@ export class XboardApiClient {
       const payload = parseJsonMaybe(text)
       if (payload === null && text) {
         throw new Error('后端响应不是合法 JSON')
+      }
+
+      if (
+        options.authData &&
+        payload &&
+        typeof payload === 'object' &&
+        payload.status === 'fail'
+      ) {
+        const message = messageFromPayload(payload, '登录状态已失效，请重新登录')
+        if (
+          path.includes('/api/v1/user/checkLogin') ||
+          isAuthExpiredMessage(message)
+        ) {
+          throwAuthExpired(message)
+        }
       }
 
       const result = unwrapResult(payload)

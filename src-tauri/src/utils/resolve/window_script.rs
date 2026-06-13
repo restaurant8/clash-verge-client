@@ -6,8 +6,8 @@ pub fn build_window_initial_script(initial_theme_mode: &str, dark_background: &s
     };
     format!(
         r#"
-    window.__VERGE_INITIAL_THEME_MODE = "{theme_mode}";
-    window.__VERGE_INITIAL_THEME_COLORS = {{
+    window.__MUACLOUD_INITIAL_THEME_MODE = "{theme_mode}";
+    window.__MUACLOUD_INITIAL_THEME_COLORS = {{
         darkBg: "{dark_background}",
         lightBg: "{light_background}",
     }};
@@ -25,7 +25,7 @@ pub const WINDOW_INITIAL_SCRIPT: &str = r##"
 
     const initialColors = (() => {
         try {
-            const colors = window.__VERGE_INITIAL_THEME_COLORS;
+            const colors = window.__MUACLOUD_INITIAL_THEME_COLORS;
             if (colors && typeof colors === "object") {
                 const { darkBg, lightBg } = colors;
                 if (typeof darkBg === "string" && typeof lightBg === "string") {
@@ -47,8 +47,8 @@ pub const WINDOW_INITIAL_SCRIPT: &str = r##"
         }
     })();
 
-    const initialThemeMode = typeof window.__VERGE_INITIAL_THEME_MODE === "string"
-        ? window.__VERGE_INITIAL_THEME_MODE
+    const initialThemeMode = typeof window.__MUACLOUD_INITIAL_THEME_MODE === "string"
+        ? window.__MUACLOUD_INITIAL_THEME_MODE
         : "system";
 
     let initialTheme = prefersDark ? "dark" : "light";

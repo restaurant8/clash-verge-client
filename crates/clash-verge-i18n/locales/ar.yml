@@ -22,18 +22,18 @@ notifications:
     body: تمت إعادة تفعيل الملف التعريفي.
   appQuit:
     title: على وشك الخروج
-    body: Clash Verge على وشك الخروج.
+    body: MuaCloud على وشك الخروج.
   appHidden:
     title: تم إخفاء التطبيق
-    body: Clash Verge يعمل في الخلفية.
+    body: MuaCloud يعمل في الخلفية.
   updateReady:
-    title: Clash Verge Update
+    title: MuaCloud Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: يتطلب تثبيت خدمة Clash Verge صلاحيات المسؤول.
-  adminUninstallPrompt: يتطلب إلغاء تثبيت خدمة Clash Verge صلاحيات المسؤول.
+  adminInstallPrompt: يتطلب تثبيت خدمة MuaCloud صلاحيات المسؤول.
+  adminUninstallPrompt: يتطلب إلغاء تثبيت خدمة MuaCloud صلاحيات المسؤول.
 tray:
   dashboard: لوحة التحكم
   ruleMode: وضع القواعد
@@ -58,7 +58,7 @@ tray:
   coreLog: سجل النواة
   restartClash: إعادة تشغيل نواة Clash
   restartApp: إعادة تشغيل التطبيق
-  vergeVersion: إصدار Verge
+  vergeVersion: إصدار MuaCloud
   more: المزيد
   exit: خروج
   tooltip:

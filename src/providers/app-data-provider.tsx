@@ -144,6 +144,7 @@ export const AppDataProvider = ({
       lastUpdateTime = now
       void queryClient.invalidateQueries({ queryKey: ['getProfiles'] })
       refreshProxy().catch(() => {})
+      refreshProxyProviders().catch(() => {})
       refreshRules().catch(() => {})
       refreshRuleProviders().catch(() => {})
     }
@@ -188,7 +189,7 @@ export const AppDataProvider = ({
         }
       })
     }
-  }, [refreshProxy, refreshRules, refreshRuleProviders])
+  }, [refreshProxy, refreshProxyProviders, refreshRules, refreshRuleProviders])
 
   const refreshAll = useCallback(async () => {
     await Promise.all([

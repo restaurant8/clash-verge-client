@@ -28,7 +28,7 @@ import { useLockFn } from 'ahooks'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
-import brandLogo from '@/assets/image/muacloud-mascot-logo.png'
+import brandLogo from '@/assets/image/muacloud-logo.svg'
 import { ClashModeCard } from '@/components/home/clash-mode-card'
 import { EnhancedCard } from '@/components/home/enhanced-card'
 import { ProxyTunCard } from '@/components/home/proxy-tun-card'
@@ -962,7 +962,10 @@ const AuthPanel = () => {
         : '找回密码'
   const modeSubtitle =
     mode === 'login'
-      ? cleanDisplayText(remote.remoteConfig.login_title, '欢迎回来，继续畅享稳定服务')
+      ? cleanDisplayText(
+          remote.remoteConfig.login_title,
+          '欢迎回来，继续畅享稳定服务',
+        )
       : mode === 'register'
         ? '注册后即可开通套餐，开始使用专属加速服务'
         : '验证邮箱后重设密码，继续使用你的账户'
@@ -1264,14 +1267,8 @@ const AuthPanel = () => {
 
 const ConnectPage = () => {
   const navigate = useNavigate()
-  const {
-    session,
-    userInfo,
-    subscribeInfo,
-    servers,
-    booting,
-    connection,
-  } = useXboard()
+  const { session, userInfo, subscribeInfo, servers, booting, connection } =
+    useXboard()
 
   const used = Number(subscribeInfo?.u ?? 0) + Number(subscribeInfo?.d ?? 0)
   const total = Number(subscribeInfo?.transfer_enable ?? 0)
@@ -1305,10 +1302,7 @@ const ConnectPage = () => {
   if (!session) return <AuthPanel />
 
   return (
-    <XboardPage
-      title="系统-网卡双代理"
-      subtitle="真全局"
-    >
+    <XboardPage title="系统-网卡双代理" subtitle="真全局">
       <Stack spacing={2}>
         {connection.status === 'error' && connection.message && (
           <Alert severity="error">{connection.message}</Alert>

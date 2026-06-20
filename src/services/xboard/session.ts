@@ -9,8 +9,14 @@ export const readXboardSession = (): XboardSession | null => {
     const raw = window.localStorage.getItem(SESSION_KEY)
     if (!raw) return null
     const session = JSON.parse(raw) as XboardSession
-    if (!session?.authData || !session?.subscribeToken) return null
-    return session
+    if (!session?.authData) return null
+    return {
+      ...session,
+      subscribeToken:
+        typeof session.subscribeToken === 'string'
+          ? session.subscribeToken
+          : '',
+    }
   } catch {
     return null
   }

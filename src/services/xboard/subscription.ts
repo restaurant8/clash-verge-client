@@ -64,6 +64,34 @@ const isGeneratedXboardProfile = (
     item.type === 'local' &&
     item.option?.allow_auto_update === false)
 
+const extractProfileSubscribeToken = (url?: string) => {
+  if (!url) return ''
+
+  try {
+    const parsed = new URL(url)
+    const queryToken = parsed.searchParams.get('token')
+    if (queryToken) return queryToken
+
+    const lastPathSegment = parsed.pathname.split('/').filter(Boolean).at(-1)
+    return lastPathSegment ? decodeURIComponent(lastPathSegment) : ''
+  } catch {
+    return ''
+  }
+}
+
+export const getCachedXboardSubscriptionTokens = async () => {
+  const profiles = await getProfiles()
+  const tokens = (profiles.items ?? [])
+    .filter(
+      (item) =>
+        item.uid === XBOARD_PROFILE_UID || item.desc === XBOARD_PROFILE_DESC,
+    )
+    .map((item) => extractProfileSubscribeToken(item.url))
+    .filter(Boolean)
+
+  return [...new Set(tokens)]
+}
+
 const cleanupStaleXboardProfiles = async (
   activeUid: string,
   profileName: string,

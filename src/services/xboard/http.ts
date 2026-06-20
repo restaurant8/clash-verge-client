@@ -10,27 +10,38 @@ export const xboardFetch = async (
   url: string,
   options: XboardFetchOptions = {},
 ) => {
-  if (isTauriRuntime()) {
-    return tauriFetch(url, options)
+  const { connectTimeout, ...fetchOptions } = options
+  const controller = new AbortController()
+  const externalSignal = fetchOptions.signal
+  const abortFromExternalSignal = () => controller.abort()
+
+  if (externalSignal?.aborted) {
+    controller.abort()
+  } else {
+    externalSignal?.addEventListener('abort', abortFromExternalSignal, {
+      once: true,
+    })
   }
 
-  const { connectTimeout, ...fetchOptions } = options
-  const controller =
-    connectTimeout && typeof AbortController !== 'undefined'
-      ? new AbortController()
-      : undefined
-
-  const timeoutId =
-    controller && connectTimeout
-      ? window.setTimeout(() => controller.abort(), connectTimeout)
-      : undefined
+  const timeoutId = connectTimeout
+    ? window.setTimeout(() => controller.abort(), connectTimeout)
+    : undefined
 
   try {
+    if (isTauriRuntime()) {
+      return await tauriFetch(url, {
+        ...fetchOptions,
+        connectTimeout,
+        signal: controller.signal,
+      })
+    }
+
     return await fetch(url, {
       ...fetchOptions,
-      signal: controller?.signal ?? fetchOptions.signal,
+      signal: controller.signal,
     })
   } finally {
     if (timeoutId) window.clearTimeout(timeoutId)
+    externalSignal?.removeEventListener('abort', abortFromExternalSignal)
   }
 }

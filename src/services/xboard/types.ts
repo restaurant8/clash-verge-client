@@ -7,6 +7,7 @@ export interface XboardRemoteConfig extends XboardRecord {
   custom_ua: string
   app_logo: string
   oss_url: string
+  'domains-api': string
   api_domains: string
   backup_api_domains: string
   subscribe_path: string
@@ -52,6 +53,7 @@ export interface XboardResolvedConfig {
   bootstrap?: XboardBootstrapData
   activeApiDomain: string
   apiDomains: string[]
+  apiRequestDomains: string[]
   configSource: string
   fetchedAt: number
   degraded: boolean

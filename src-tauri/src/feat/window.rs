@@ -21,6 +21,17 @@ pub async fn quit() {
     // 设置退出标志
     handle::Handle::global().set_is_exiting();
 
+    // 看门狗：即使后续某一步清理卡死，也保证进程一定会结束。否则内嵌的单例服务器
+    // 会一直占用端口，导致再次打开应用“没有反应”（见 utils::server::check_singleton），
+    // 同时内核进程残留无法清理。正常退出时本线程会随进程一起结束，不会触发。
+    std::thread::spawn(|| {
+        std::thread::sleep(Duration::from_secs(8));
+        logging!(warn, Type::System, "退出超时，强制结束进程");
+        #[cfg(target_os = "windows")]
+        kill_stray_cores();
+        std::process::exit(0);
+    });
+
     utils::server::shutdown_embedded_server();
     Config::apply_all_and_save_file().await;
 
@@ -34,8 +45,28 @@ pub async fn quit() {
         if cleanup_result { 0 } else { 1 }
     );
 
+    // 兜底：清理可能未被子进程句柄管理到的残留内核（例如上次异常退出留下的孤儿进程，
+    // 或 stop_core 超时未杀干净的情况），避免 muacloud-mihomo.exe 不断累积。
+    #[cfg(target_os = "windows")]
+    kill_stray_cores();
+
     let app_handle = handle::Handle::app_handle();
     app_handle.exit(if cleanup_result { 0 } else { 1 });
+}
+
+/// Best-effort kill of our own stray mihomo cores by image name (Windows).
+/// Only targets the cores this app spawns; foreign cores (e.g. a separately
+/// installed Clash Verge's `verge-mihomo.exe`) are intentionally left alone.
+#[cfg(target_os = "windows")]
+fn kill_stray_cores() {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    for image in ["muacloud-mihomo.exe", "muacloud-mihomo-alpha.exe"] {
+        let _ = std::process::Command::new("taskkill")
+            .args(["/F", "/IM", image])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output();
+    }
 }
 
 pub async fn clean_async() -> bool {

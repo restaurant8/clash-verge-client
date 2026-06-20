@@ -30,6 +30,7 @@ import { UpdateButton } from '@/components/layout/update-button'
 import { WindowControls } from '@/components/layout/window-controller'
 import { CrispSupport } from '@/components/xboard/crisp-support'
 import { XboardAnnouncementDialog } from '@/components/xboard/xboard-announcement-dialog'
+import { XboardUpdateDialog } from '@/components/xboard/xboard-update-dialog'
 import { useI18n } from '@/hooks/use-i18n'
 import { useVerge } from '@/hooks/use-verge'
 import { useWindow } from '@/hooks/use-window'
@@ -243,31 +244,34 @@ const Layout = () => {
     void patchVerge({ collapse_navbar: !navCollapsed })
   }, [navCollapsed, patchVerge])
 
-  const handleNavItemActivate = useCallback((item: NavItem) => {
-    if (settingsMenuUnlocked) return undefined
+  const handleNavItemActivate = useCallback(
+    (item: NavItem) => {
+      if (settingsMenuUnlocked) return undefined
 
-    if (item.path !== '/account') {
-      accountMenuClickRef.current = { count: 0, lastAt: 0 }
+      if (item.path !== '/account') {
+        accountMenuClickRef.current = { count: 0, lastAt: 0 }
+        return undefined
+      }
+
+      const now = Date.now()
+      const isContinuous =
+        now - accountMenuClickRef.current.lastAt <=
+        SETTINGS_UNLOCK_CLICK_WINDOW_MS
+      const count = isContinuous ? accountMenuClickRef.current.count + 1 : 1
+
+      accountMenuClickRef.current = { count, lastAt: now }
+
+      if (count >= SETTINGS_UNLOCK_CLICK_COUNT) {
+        accountMenuClickRef.current = { count: 0, lastAt: 0 }
+        setSettingsMenuUnlocked(true)
+        window.sessionStorage.setItem(SETTINGS_UNLOCK_STORAGE_KEY, '1')
+        return '/settings'
+      }
+
       return undefined
-    }
-
-    const now = Date.now()
-    const isContinuous =
-      now - accountMenuClickRef.current.lastAt <=
-      SETTINGS_UNLOCK_CLICK_WINDOW_MS
-    const count = isContinuous ? accountMenuClickRef.current.count + 1 : 1
-
-    accountMenuClickRef.current = { count, lastAt: now }
-
-    if (count >= SETTINGS_UNLOCK_CLICK_COUNT) {
-      accountMenuClickRef.current = { count: 0, lastAt: 0 }
-      setSettingsMenuUnlocked(true)
-      window.sessionStorage.setItem(SETTINGS_UNLOCK_STORAGE_KEY, '1')
-      return '/settings'
-    }
-
-    return undefined
-  }, [settingsMenuUnlocked])
+    },
+    [settingsMenuUnlocked],
+  )
 
   const customTitlebar = useMemo(
     () =>
@@ -385,6 +389,7 @@ const Layout = () => {
       <NoticeManager position={verge?.notice_position} />
       <CrispSupport />
       <XboardAnnouncementDialog />
+      <XboardUpdateDialog />
       <div
         style={{
           animation: 'fadeIn 0.5s',

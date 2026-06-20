@@ -1,4 +1,12 @@
 import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  Stack,
+  Typography,
+} from '@mui/material'
+import {
   ReactNode,
   useCallback,
   useEffect,
@@ -26,11 +34,13 @@ import {
 } from '@/services/xboard/session'
 import {
   ensureXboardSubscriptionProfile,
+  getCachedXboardSubscriptionTokens,
   restartCoreForXboard,
 } from '@/services/xboard/subscription'
 import type {
   XboardAccountSnapshot,
   XboardAuthPayload,
+  XboardBootstrapData,
   XboardConnectionState,
   XboardRecord,
   XboardResourceCache,
@@ -40,6 +50,9 @@ import type {
 } from '@/services/xboard/types'
 
 import { XboardContext } from './xboard-context'
+
+const asRecord = (value: unknown): XboardRecord =>
+  value && typeof value === 'object' ? (value as XboardRecord) : {}
 
 const asArray = (value: any): XboardRecord[] => {
   if (Array.isArray(value)) return value
@@ -74,11 +87,17 @@ const createEmptyResourceCache = (): XboardResourceCache => ({
   ticketDetails: {},
 })
 
+type SubscriptionInitializationState = {
+  status: 'idle' | 'loading' | 'error'
+  message?: string
+}
+
 const buildClient = (remote: XboardResolvedConfig) =>
   new XboardApiClient(
     remote.activeApiDomain,
     remote.remoteConfig.custom_ua || 'muacloud/1.0',
     remote.apiDomains,
+    remote.apiRequestDomains,
   )
 
 const fallbackUnlessAuthExpired = <T,>(error: unknown, fallback: T) => {
@@ -89,17 +108,30 @@ const fallbackUnlessAuthExpired = <T,>(error: unknown, fallback: T) => {
 const loadAccountSnapshot = async (
   client: XboardApiClient,
   session: XboardSession,
+  verifySession = true,
 ): Promise<XboardAccountSnapshot> => {
-  await client.checkLogin(session.authData)
+  if (verifySession) {
+    await client.checkLogin(session.authData)
+  }
 
-  const [userInfo, subscribeInfo] = await Promise.all([
-    client
-      .userInfo(session.authData)
-      .catch((error) => fallbackUnlessAuthExpired(error, { error })),
-    client
-      .getSubscribe(session.authData)
-      .catch((error) => fallbackUnlessAuthExpired(error, { error })),
-  ])
+  const [userInfo, subscribeInfo, serverPayload, appConfig, noticePayload] =
+    await Promise.all([
+      client
+        .userInfo(session.authData)
+        .catch((error) => fallbackUnlessAuthExpired(error, { error })),
+      client
+        .getSubscribe(session.authData)
+        .catch((error) => fallbackUnlessAuthExpired(error, { error })),
+      client
+        .fetchServers(session.authData)
+        .catch((error) => fallbackUnlessAuthExpired(error, [])),
+      session.subscribeToken
+        ? client.appConfig(session.subscribeToken).catch(() => undefined)
+        : undefined,
+      client
+        .notices(session.authData)
+        .catch((error) => fallbackUnlessAuthExpired(error, [])),
+    ])
 
   const subscribeToken = extractSubscribeToken(
     subscribeInfo,
@@ -112,18 +144,6 @@ const loadAccountSnapshot = async (
     email: userInfo?.email ?? userInfo?.user?.email ?? session.email,
   }
 
-  const [serverPayload, appConfig, noticePayload] = await Promise.all([
-    client
-      .fetchServers(session.authData)
-      .catch((error) => fallbackUnlessAuthExpired(error, [])),
-    subscribeToken
-      ? client.appConfig(subscribeToken).catch(() => undefined)
-      : undefined,
-    client
-      .notices(session.authData)
-      .catch((error) => fallbackUnlessAuthExpired(error, [])),
-  ])
-
   return {
     session: nextSession,
     userInfo,
@@ -131,6 +151,48 @@ const loadAccountSnapshot = async (
     servers: asArray(serverPayload),
     appConfig,
     notices: asArray(noticePayload),
+  }
+}
+
+const loadPublicBootstrap = async (
+  client: XboardApiClient,
+): Promise<XboardBootstrapData> => {
+  try {
+    return asRecord(await client.appBootstrap()) as XboardBootstrapData
+  } catch {
+    const guestConfig = asRecord(await client.guestConfig())
+    return {
+      app_info: guestConfig,
+      public_ui_config: guestConfig,
+      guest_config: guestConfig,
+      features: {
+        enable_register:
+          guestConfig.enable_register ??
+          guestConfig.register_enable ??
+          guestConfig.is_register,
+        stop_register:
+          guestConfig.stop_register ?? guestConfig.disable_registration,
+        email_gmail_limit_enable:
+          guestConfig.email_gmail_limit_enable ??
+          guestConfig.gmail_alias_limit ??
+          guestConfig.disable_gmail_alias,
+        email_verify: guestConfig.email_verify ?? guestConfig.is_email_verify,
+        invite_force: guestConfig.invite_force ?? guestConfig.is_invite_force,
+        captcha: guestConfig.captcha ?? guestConfig.is_captcha,
+        is_captcha:
+          guestConfig.is_captcha ??
+          guestConfig.captcha_enable ??
+          guestConfig.enable_captcha,
+        captcha_enable:
+          guestConfig.captcha_enable ??
+          guestConfig.is_captcha ??
+          guestConfig.enable_captcha,
+        captcha_type: guestConfig.captcha_type,
+        recaptcha_site_key: guestConfig.recaptcha_site_key,
+        recaptcha_v3_site_key: guestConfig.recaptcha_v3_site_key,
+        turnstile_site_key: guestConfig.turnstile_site_key,
+      },
+    }
   }
 }
 
@@ -177,6 +239,10 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
     status: 'disconnected',
   })
   const lastAuthExpiredNoticeAtRef = useRef(0)
+  const authOperationRef = useRef(0)
+  const cachedSubscriptionTokensRef = useRef(new Set<string>())
+  const [subscriptionInitialization, setSubscriptionInitialization] =
+    useState<SubscriptionInitializationState>({ status: 'idle' })
 
   const client = useMemo(() => buildClient(remote), [remote])
 
@@ -186,7 +252,10 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshRemoteConfig = useCallback(async (force = false) => {
     const next = await resolveXboardRemoteConfig({ force })
-    setRemote(next)
+    setRemote((current) => ({
+      ...next,
+      bootstrap: next.bootstrap ?? current.bootstrap,
+    }))
     return next
   }, [])
 
@@ -230,6 +299,7 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
   )
 
   const logout = useCallback(() => {
+    authOperationRef.current += 1
     clearXboardSession()
     setSession(null)
     setUserInfo(undefined)
@@ -238,6 +308,8 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
     setAppConfig(undefined)
     setNotices([])
     setConnection({ status: 'disconnected' })
+    setRefreshing(false)
+    setSubscriptionInitialization({ status: 'idle' })
     clearResourceCache()
   }, [clearResourceCache])
 
@@ -404,6 +476,136 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
     [client, resourceCache.trafficLogs, session],
   )
 
+  const startAuthenticatedSession = useCallback(
+    (
+      authenticatedClient: XboardApiClient,
+      nextSession: XboardSession,
+      actionLabel: '登录' | '注册',
+    ) => {
+      const operationId = ++authOperationRef.current
+      let hasCachedSubscription =
+        Boolean(nextSession.subscribeToken) &&
+        cachedSubscriptionTokensRef.current.has(nextSession.subscribeToken)
+
+      clearResourceCache()
+      setUserInfo(undefined)
+      setSubscribeInfo(undefined)
+      setServers([])
+      setAppConfig(undefined)
+      setNotices([])
+      setSession(nextSession)
+      saveXboardSession(nextSession)
+      setRefreshing(false)
+      setSubscriptionInitialization(
+        hasCachedSubscription ? { status: 'idle' } : { status: 'loading' },
+      )
+      showNotice.success(`${actionLabel}成功，正在后台同步账号与订阅`)
+
+      void (async () => {
+        try {
+          if (!hasCachedSubscription && nextSession.subscribeToken) {
+            const cachedTokens = await getCachedXboardSubscriptionTokens()
+            cachedTokens.forEach((token) =>
+              cachedSubscriptionTokensRef.current.add(token),
+            )
+            hasCachedSubscription = cachedSubscriptionTokensRef.current.has(
+              nextSession.subscribeToken,
+            )
+            if (hasCachedSubscription) {
+              setSubscriptionInitialization({ status: 'idle' })
+            }
+          }
+
+          const snapshot = await loadAccountSnapshot(
+            authenticatedClient,
+            nextSession,
+            false,
+          )
+          if (authOperationRef.current !== operationId) return
+
+          applySnapshot(snapshot)
+          if (!snapshot.servers.length) {
+            setSubscriptionInitialization({ status: 'idle' })
+            return
+          }
+
+          const uid = await syncSubscriptionProfile(snapshot, {
+            noticeErrors: hasCachedSubscription,
+          })
+          if (authOperationRef.current !== operationId) return
+
+          if (uid) {
+            cachedSubscriptionTokensRef.current.add(
+              snapshot.session.subscribeToken,
+            )
+            setSubscriptionInitialization({ status: 'idle' })
+          } else if (!hasCachedSubscription) {
+            setSubscriptionInitialization({
+              status: 'error',
+              message: '订阅初始化失败，请检查网络后重试。',
+            })
+          }
+        } catch (error) {
+          if (authOperationRef.current !== operationId) return
+          if (handleAuthExpired(error)) return
+
+          const message = error instanceof Error ? error.message : String(error)
+          setLastError(message)
+          if (hasCachedSubscription) {
+            showNotice.error(`后台同步失败：${message}`)
+          } else {
+            setSubscriptionInitialization({ status: 'error', message })
+          }
+        }
+      })()
+    },
+    [
+      applySnapshot,
+      clearResourceCache,
+      handleAuthExpired,
+      syncSubscriptionProfile,
+    ],
+  )
+
+  const retrySubscriptionInitialization = useCallback(async () => {
+    if (!session) return
+
+    setSubscriptionInitialization({ status: 'loading' })
+    setLastError(undefined)
+    try {
+      const snapshot = await loadAccountSnapshot(client, session)
+      applySnapshot(snapshot)
+
+      if (!snapshot.servers.length) {
+        setSubscriptionInitialization({ status: 'idle' })
+        return
+      }
+
+      const uid = await syncSubscriptionProfile(snapshot)
+      if (!uid) {
+        setSubscriptionInitialization({
+          status: 'error',
+          message: '订阅初始化失败，请检查网络后重试。',
+        })
+        return
+      }
+
+      cachedSubscriptionTokensRef.current.add(snapshot.session.subscribeToken)
+      setSubscriptionInitialization({ status: 'idle' })
+    } catch (error) {
+      if (handleAuthExpired(error)) return
+      const message = error instanceof Error ? error.message : String(error)
+      setLastError(message)
+      setSubscriptionInitialization({ status: 'error', message })
+    }
+  }, [
+    applySnapshot,
+    client,
+    handleAuthExpired,
+    session,
+    syncSubscriptionProfile,
+  ])
+
   const login = useCallback(
     async (email: string, password: string) => {
       setRefreshing(true)
@@ -413,8 +615,8 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
         const authData = payload.auth_data
         const subscribeToken = extractSubscribeToken(payload)
 
-        if (!authData || !subscribeToken) {
-          throw new Error('登录响应缺少 auth_data 或 token')
+        if (!authData) {
+          throw new Error('登录响应缺少 auth_data')
         }
 
         const nextSession: XboardSession = {
@@ -424,23 +626,16 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
           email,
           loggedInAt: Date.now(),
         }
-        const snapshot = await loadAccountSnapshot(client, nextSession)
-        clearResourceCache()
-        applySnapshot(snapshot)
-        const synced = await syncSubscriptionProfile(snapshot, {
-          noticeErrors: true,
-        })
-        showNotice.success(synced ? '登录成功，订阅已加载' : '登录成功')
+        startAuthenticatedSession(client, nextSession, '登录')
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         setLastError(message)
         showNotice.error(message)
-        throw error
-      } finally {
         setRefreshing(false)
+        throw error
       }
     },
-    [applySnapshot, clearResourceCache, client, syncSubscriptionProfile],
+    [client, startAuthenticatedSession],
   )
 
   const register = useCallback(
@@ -452,8 +647,8 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
         const authData = authPayload.auth_data
         const subscribeToken = extractSubscribeToken(authPayload)
 
-        if (!authData || !subscribeToken) {
-          throw new Error('注册响应缺少 auth_data 或 token')
+        if (!authData) {
+          throw new Error('注册响应缺少 auth_data')
         }
 
         const nextSession: XboardSession = {
@@ -463,23 +658,16 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
           email: String(payload.email ?? ''),
           loggedInAt: Date.now(),
         }
-        const snapshot = await loadAccountSnapshot(client, nextSession)
-        clearResourceCache()
-        applySnapshot(snapshot)
-        const synced = await syncSubscriptionProfile(snapshot, {
-          noticeErrors: true,
-        })
-        showNotice.success(synced ? '注册成功，订阅已加载' : '注册成功')
+        startAuthenticatedSession(client, nextSession, '注册')
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         setLastError(message)
         showNotice.error(message)
-        throw error
-      } finally {
         setRefreshing(false)
+        throw error
       }
     },
-    [applySnapshot, clearResourceCache, client, syncSubscriptionProfile],
+    [client, startAuthenticatedSession],
   )
 
   const connect = useCallback(async () => {
@@ -531,27 +719,95 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     let cancelled = false
 
-    const bootstrap = async () => {
+    const initialize = async () => {
+      const storedSession = readXboardSession()
+      const cachedTokensPromise = getCachedXboardSubscriptionTokens().catch(
+        () => [] as string[],
+      )
+      if (!storedSession) {
+        setBooting(false)
+        void cachedTokensPromise.then((tokens) => {
+          tokens.forEach((token) =>
+            cachedSubscriptionTokensRef.current.add(token),
+          )
+        })
+      }
+
       try {
         const nextRemote = await refreshRemoteConfig(true)
         if (cancelled) return
-        const storedSession = readXboardSession()
-        if (storedSession) {
-          const bootstrapClient = buildClient(nextRemote)
-          const snapshot = await loadAccountSnapshot(bootstrapClient, storedSession)
-          if (!cancelled) applySnapshot(snapshot)
-          try {
-            await loadSubscriptionProfile(
-              bootstrapClient,
-              nextRemote.remoteConfig,
-              snapshot,
+        const startupClient = buildClient(nextRemote)
+
+        void loadPublicBootstrap(startupClient)
+          .then((bootstrap) => {
+            if (cancelled) return
+            setRemote((current) =>
+              current.fetchedAt === nextRemote.fetchedAt
+                ? { ...current, bootstrap }
+                : current,
             )
-            if (!cancelled) setLastError(undefined)
-          } catch (syncError) {
-            const message =
-              syncError instanceof Error ? syncError.message : String(syncError)
-            if (!cancelled) setLastError(message)
+          })
+          .catch(() => undefined)
+
+        if (storedSession) {
+          const cachedTokens = await cachedTokensPromise
+          cachedTokens.forEach((token) =>
+            cachedSubscriptionTokensRef.current.add(token),
+          )
+          const hasCachedSubscription =
+            Boolean(storedSession.subscribeToken) &&
+            cachedSubscriptionTokensRef.current.has(
+              storedSession.subscribeToken,
+            )
+
+          await startupClient.checkLogin(storedSession.authData)
+          if (cancelled) return
+          if (!hasCachedSubscription) {
+            setSubscriptionInitialization({ status: 'loading' })
           }
+          setBooting(false)
+
+          void (async () => {
+            try {
+              const snapshot = await loadAccountSnapshot(
+                startupClient,
+                storedSession,
+                false,
+              )
+              if (cancelled) return
+              applySnapshot(snapshot)
+              if (!snapshot.servers.length) {
+                setSubscriptionInitialization({ status: 'idle' })
+                return
+              }
+
+              await loadSubscriptionProfile(
+                startupClient,
+                nextRemote.remoteConfig,
+                snapshot,
+              )
+              if (!cancelled) {
+                cachedSubscriptionTokensRef.current.add(
+                  snapshot.session.subscribeToken,
+                )
+                setSubscriptionInitialization({ status: 'idle' })
+                setLastError(undefined)
+              }
+            } catch (syncError) {
+              if (cancelled || handleAuthExpired(syncError)) return
+              const message =
+                syncError instanceof Error
+                  ? syncError.message
+                  : String(syncError)
+              setLastError(message)
+              if (!hasCachedSubscription) {
+                setSubscriptionInitialization({
+                  status: 'error',
+                  message,
+                })
+              }
+            }
+          })()
         }
       } catch (error) {
         if (!cancelled && handleAuthExpired(error)) return
@@ -562,7 +818,7 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
       }
     }
 
-    void bootstrap()
+    void initialize()
 
     return () => {
       cancelled = true
@@ -628,5 +884,61 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
     ],
   )
 
-  return <XboardContext value={value}>{children}</XboardContext>
+  return (
+    <XboardContext value={value}>
+      {children}
+      {subscriptionInitialization.status !== 'idle' && (
+        <Box
+          sx={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: (theme) => theme.zIndex.modal + 10,
+            display: 'grid',
+            placeItems: 'center',
+            bgcolor: 'background.default',
+            p: 3,
+          }}
+          data-tauri-drag-region="true"
+        >
+          <Stack
+            spacing={2}
+            sx={{ width: '100%', maxWidth: 420, alignItems: 'center' }}
+          >
+            {subscriptionInitialization.status === 'loading' ? (
+              <>
+                <CircularProgress size={34} />
+                <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                  首次启动初始化中
+                </Typography>
+                <Typography color="text.secondary" sx={{ textAlign: 'center' }}>
+                  正在拉取并校验订阅配置，请稍候
+                </Typography>
+              </>
+            ) : (
+              <>
+                <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                  首次启动初始化未完成
+                </Typography>
+                <Alert severity="error" sx={{ width: '100%' }}>
+                  {subscriptionInitialization.message ||
+                    '订阅初始化失败，请检查网络后重试。'}
+                </Alert>
+                <Stack direction="row" spacing={1.5}>
+                  <Button
+                    variant="contained"
+                    onClick={() => void retrySubscriptionInitialization()}
+                  >
+                    重新初始化
+                  </Button>
+                  <Button variant="outlined" onClick={logout}>
+                    退出登录
+                  </Button>
+                </Stack>
+              </>
+            )}
+          </Stack>
+        </Box>
+      )}
+    </XboardContext>
+  )
 }

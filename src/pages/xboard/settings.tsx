@@ -2,6 +2,7 @@ import {
   ContentCopyRounded,
   DnsRounded,
   RefreshRounded,
+  SystemUpdateAltRounded,
 } from '@mui/icons-material'
 import {
   Alert,
@@ -21,7 +22,9 @@ import ProxyControlSwitches from '@/components/shared/proxy-control-switches'
 import { XboardPage } from '@/components/xboard/xboard-page'
 import { XboardEmpty, XboardPanel } from '@/components/xboard/xboard-primitives'
 import { useXboard } from '@/providers/xboard-context'
+import { XBOARD_CHECK_UPDATE_EVENT } from '@/services/xboard/update'
 import { isTauriRuntime } from '@/utils/tauri'
+import { version as appVersion } from '@root/package.json'
 
 const SettingsPage = () => {
   const { remote, refreshRemoteConfig, refreshing, lastError } = useXboard()
@@ -137,6 +140,29 @@ const SettingsPage = () => {
               />
             </Grid>
           </Grid>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              mt: 1.5,
+              flexWrap: 'wrap',
+            }}
+          >
+            <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
+              当前版本 v{appVersion}
+            </Typography>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<SystemUpdateAltRounded />}
+              onClick={() =>
+                window.dispatchEvent(new CustomEvent(XBOARD_CHECK_UPDATE_EVENT))
+              }
+            >
+              检查更新
+            </Button>
+          </Box>
           <Divider sx={{ my: 2 }} />
           <Stack spacing={1}>
             {remote.apiDomains.map((domain) => (

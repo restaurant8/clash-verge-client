@@ -1,5 +1,12 @@
 import { isTauriRuntime } from '@/utils/tauri'
 
+import {
+  XBOARD_API_CDN_TIMEOUT_MS,
+  XBOARD_API_ORIGIN_TIMEOUT_MS,
+  clearApiCdnFailure,
+  isApiCdnCoolingDown,
+  markApiCdnFailure,
+} from './api-domain-health'
 import { xboardFetch } from './http'
 import type { XboardAuthPayload, XboardOrderCheckoutResult } from './types'
 
@@ -133,44 +140,91 @@ const unwrapResult = (payload: any): XboardApiResult => {
 }
 
 export class XboardApiClient {
-  private activeBaseUrl: string
-  private readonly baseUrls: string[]
+  private activeApiBaseUrl: string
+  private readonly webBaseUrl: string
+  private readonly originBaseUrls: string[]
+  private readonly apiBaseUrls: string[]
+  private readonly cdnApiBaseUrls: Set<string>
   readonly userAgent: string
 
-  constructor(baseUrl: string, userAgent: string, baseUrls: string[] = []) {
-    const normalizedBaseUrls = [baseUrl, ...baseUrls]
+  constructor(
+    baseUrl: string,
+    userAgent: string,
+    originBaseUrls: string[] = [],
+    apiBaseUrls: string[] = [],
+  ) {
+    const normalizedOriginBaseUrls = [baseUrl, ...originBaseUrls]
       .map((value) => value.replace(/\/+$/, ''))
       .filter(Boolean)
+    this.originBaseUrls = [...new Set(normalizedOriginBaseUrls)]
+    this.webBaseUrl = this.originBaseUrls[0] || baseUrl.replace(/\/+$/, '')
 
-    this.baseUrls = [...new Set(normalizedBaseUrls)]
-    this.activeBaseUrl = this.baseUrls[0] || baseUrl.replace(/\/+$/, '')
+    const normalizedApiBaseUrls = apiBaseUrls
+      .map((value) => value.replace(/\/+$/, ''))
+      .filter(Boolean)
+    this.cdnApiBaseUrls = new Set(
+      normalizedApiBaseUrls.filter(
+        (apiBaseUrl) => !this.originBaseUrls.includes(apiBaseUrl),
+      ),
+    )
+    this.apiBaseUrls = [
+      ...new Set([...normalizedApiBaseUrls, ...this.originBaseUrls]),
+    ]
+    this.activeApiBaseUrl = this.apiBaseUrls[0] || this.webBaseUrl
     this.userAgent = userAgent
   }
 
   get baseUrl() {
-    return this.activeBaseUrl
+    return this.activeApiBaseUrl
   }
 
   get webSubscribeBase() {
-    return this.baseUrl
+    return this.webBaseUrl
   }
 
   webSubscribeUrl(subscribePath: string, token: string) {
     return joinUrl(
-      this.baseUrl,
+      this.webBaseUrl,
       `${subscribePath}/${encodeURIComponent(token)}`,
     )
   }
 
-  private orderedBaseUrls() {
-    return [
-      this.activeBaseUrl,
-      ...this.baseUrls.filter((baseUrl) => baseUrl !== this.activeBaseUrl),
-    ]
+  private isApiPath(path: string) {
+    return /^\/?api\/v[12](?:[/?#]|$)/i.test(path)
+  }
+
+  private orderedBaseUrlTiers(path: string) {
+    if (!this.isApiPath(path)) return [this.originBaseUrls]
+
+    const cdnTier = this.apiBaseUrls.filter(
+      (baseUrl) =>
+        this.cdnApiBaseUrls.has(baseUrl) && !isApiCdnCoolingDown(baseUrl),
+    )
+    const originTier = this.apiBaseUrls.filter(
+      (baseUrl) => !this.cdnApiBaseUrls.has(baseUrl),
+    )
+
+    return [cdnTier, originTier].filter((tier) => tier.length > 0)
   }
 
   private shouldFailoverStatus(status: number) {
-    return status === 408 || status === 429 || status >= 500
+    return status === 404 || status === 408 || status === 429 || status >= 500
+  }
+
+  private shouldFailoverCdnStatus(status: number) {
+    return status === 403 || status === 404 || this.shouldFailoverStatus(status)
+  }
+
+  private normalizeTransportError(error: unknown) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (
+      /request failed|failed to fetch|network error|request cancelled|abort/i.test(
+        message,
+      )
+    ) {
+      return new Error('无法连接 API 服务，请检查网络后重试')
+    }
+    return error instanceof Error ? error : new Error(message)
   }
 
   private async request<T>(path: string, options: RequestOptions = {}) {
@@ -193,88 +247,149 @@ export class XboardApiClient {
       headers.Authorization = `Bearer ${options.authData}`
     }
 
-    let lastError: unknown
-    const baseUrls = canFailover ? this.orderedBaseUrls() : [this.activeBaseUrl]
+    type AttemptResult = {
+      baseUrl: string
+      response: Response
+      text: string
+    }
 
-    for (const baseUrl of baseUrls) {
-      let response: Response
+    const attempt = async (
+      baseUrl: string,
+      signal?: AbortSignal,
+    ): Promise<AttemptResult> => {
       const url = joinUrl(baseUrl, path)
+      const isCdnApiRequest =
+        this.isApiPath(path) && this.cdnApiBaseUrls.has(baseUrl)
 
       try {
-        response = await xboardFetch(url, {
+        const response = await xboardFetch(url, {
           method,
-          connectTimeout: 8000,
+          connectTimeout: isCdnApiRequest
+            ? XBOARD_API_CDN_TIMEOUT_MS
+            : XBOARD_API_ORIGIN_TIMEOUT_MS,
+          signal,
           headers,
           body: options.body == null ? undefined : JSON.stringify(options.body),
         })
-      } catch (error) {
-        lastError = error
-        continue
-      }
-
-      let text: string
-      try {
-        text = await response.text()
-      } catch (error) {
-        lastError = error
-        continue
-      }
-
-      if (!response.ok) {
-        const payload = parseJsonMaybe(text)
-        const error = new Error(
-          messageFromPayload(
-            payload,
-            text || `请求失败：HTTP ${response.status}`,
-          ),
-        )
+        const text = await response.text()
 
         if (
-          options.authData &&
-          (response.status === 401 || response.status === 403)
+          !response.ok &&
+          (isCdnApiRequest
+            ? this.shouldFailoverCdnStatus(response.status)
+            : this.shouldFailoverStatus(response.status))
         ) {
-          throwAuthExpired(error.message, response.status)
+          throw new Error(
+            messageFromPayload(
+              parseJsonMaybe(text),
+              text || `请求失败：HTTP ${response.status}`,
+            ),
+          )
         }
 
-        if (canFailover && this.shouldFailoverStatus(response.status)) {
-          lastError = error
-          continue
+        if (!options.rawText && text && parseJsonMaybe(text) === null) {
+          throw new Error('后端响应不是合法 JSON')
         }
 
-        throw error
+        if (isCdnApiRequest) clearApiCdnFailure(baseUrl)
+        return { baseUrl, response, text }
+      } catch (error) {
+        if (isCdnApiRequest && !signal?.aborted) {
+          markApiCdnFailure(baseUrl)
+        }
+        throw this.normalizeTransportError(error)
       }
+    }
 
-      this.activeBaseUrl = baseUrl
-
-      if (options.rawText) {
-        return text as T
+    const raceTier = async (baseUrls: string[]) => {
+      const controllers = baseUrls.map(() => new AbortController())
+      try {
+        return await Promise.any(
+          baseUrls.map((baseUrl, index) =>
+            attempt(baseUrl, controllers[index].signal),
+          ),
+        )
+      } finally {
+        controllers.forEach((controller) => controller.abort())
       }
+    }
 
+    const tiers = this.orderedBaseUrlTiers(path)
+    let attemptResult: AttemptResult | undefined
+    let lastError: unknown
+
+    if (canFailover) {
+      for (const tier of tiers) {
+        try {
+          attemptResult = await raceTier(tier)
+          break
+        } catch (error) {
+          const aggregateErrors =
+            error instanceof AggregateError ? error.errors : []
+          lastError =
+            aggregateErrors[aggregateErrors.length - 1] ??
+            this.normalizeTransportError(error)
+        }
+      }
+    } else {
+      const baseUrl = tiers[0]?.[0] || this.webBaseUrl
+      try {
+        attemptResult = await attempt(baseUrl)
+      } catch (error) {
+        lastError = error
+      }
+    }
+
+    if (!attemptResult) {
+      throw lastError instanceof Error ? lastError : new Error('请求失败')
+    }
+
+    const { baseUrl, response, text } = attemptResult
+
+    if (!response.ok) {
       const payload = parseJsonMaybe(text)
-      if (payload === null && text) {
-        throw new Error('后端响应不是合法 JSON')
-      }
+      const error = new Error(
+        messageFromPayload(
+          payload,
+          text || `请求失败：HTTP ${response.status}`,
+        ),
+      )
 
       if (
         options.authData &&
-        payload &&
-        typeof payload === 'object' &&
-        payload.status === 'fail'
+        (response.status === 401 || response.status === 403)
       ) {
-        const message = messageFromPayload(payload, '登录状态已失效，请重新登录')
-        if (
-          path.includes('/api/v1/user/checkLogin') ||
-          isAuthExpiredMessage(message)
-        ) {
-          throwAuthExpired(message)
-        }
+        throwAuthExpired(error.message, response.status)
       }
 
-      const result = unwrapResult(payload)
-      return (options.includeMessage ? result : result.data) as T
+      throw error
     }
 
-    throw lastError instanceof Error ? lastError : new Error('请求失败')
+    if (this.isApiPath(path)) this.activeApiBaseUrl = baseUrl
+
+    if (options.rawText) {
+      return text as T
+    }
+
+    const payload = parseJsonMaybe(text)
+
+    if (
+      options.authData &&
+      payload &&
+      typeof payload === 'object' &&
+      payload.status === 'fail'
+    ) {
+      const message = messageFromPayload(payload, '登录状态已失效，请重新登录')
+      if (
+        path.includes('/api/v1/user/checkLogin') ||
+        isAuthExpiredMessage(message)
+      ) {
+        throwAuthExpired(message)
+      }
+    }
+
+    const result = unwrapResult(payload)
+    return (options.includeMessage ? result : result.data) as T
   }
 
   appBootstrap() {

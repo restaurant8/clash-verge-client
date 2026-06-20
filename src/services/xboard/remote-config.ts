@@ -1,10 +1,5 @@
 import { xboardFetch } from './http'
-import type {
-  XboardBootstrapData,
-  XboardRecord,
-  XboardRemoteConfig,
-  XboardResolvedConfig,
-} from './types'
+import type { XboardRemoteConfig, XboardResolvedConfig } from './types'
 
 export const XBOARD_REMOTE_CONFIG_URLS = [
   'https://d1m6vp8arykpci.cloudfront.net/client-config.env',
@@ -23,6 +18,7 @@ export const XBOARD_SEED_REMOTE_CONFIG: XboardRemoteConfig = {
   custom_ua: 'muacloud/1.0',
   app_logo: '',
   oss_url: '',
+  'domains-api': '',
   api_domains: XBOARD_FALLBACK_API_DOMAIN,
   backup_api_domains: '',
   subscribe_path: 'link',
@@ -52,7 +48,7 @@ export const XBOARD_SEED_REMOTE_CONFIG: XboardRemoteConfig = {
   android_force_update: false,
 }
 
-const CACHE_KEY = 'xboard.remote-config.v2'
+const CACHE_KEY = 'xboard.remote-config.v3'
 
 const isBrowserStorageReady = () => typeof window !== 'undefined'
 
@@ -134,11 +130,12 @@ export const normalizeRemoteConfig = (
     ...(input ?? {}),
   }
 
+  const acceleratedApiDomains = parseDomainList(merged['domains-api'])
   const apiDomains = parseDomainList(
     merged.api_domains,
-    merged.backup_api_domains,
     XBOARD_FALLBACK_API_DOMAIN,
   )
+  const backupApiDomains = parseDomainList(merged.backup_api_domains)
 
   return {
     ...merged,
@@ -150,8 +147,9 @@ export const normalizeRemoteConfig = (
     custom_ua: String(merged.custom_ua || XBOARD_SEED_REMOTE_CONFIG.custom_ua),
     app_logo: String(merged.app_logo || ''),
     oss_url: normalizeDomain(String(merged.oss_url || '')),
+    'domains-api': acceleratedApiDomains.join(';'),
     api_domains: apiDomains.join(';'),
-    backup_api_domains: String(merged.backup_api_domains || ''),
+    backup_api_domains: backupApiDomains.join(';'),
     subscribe_path: String(
       merged.subscribe_path || XBOARD_SEED_REMOTE_CONFIG.subscribe_path,
     ).replace(/^\/+|\/+$/g, ''),
@@ -215,14 +213,24 @@ const readCachedConfig = (): XboardResolvedConfig | null => {
     if (!raw) return null
     const parsed = JSON.parse(raw) as XboardResolvedConfig
     if (!parsed?.activeApiDomain) return null
+    const remoteConfig = normalizeRemoteConfig(parsed.remoteConfig)
+    const apiDomains = parseDomainList(
+      remoteConfig.api_domains,
+      remoteConfig.backup_api_domains,
+      parsed.activeApiDomain,
+    )
+    const apiRequestDomains = parseDomainList(
+      remoteConfig['domains-api'],
+      apiDomains,
+    )
     return {
       ...parsed,
-      remoteConfig: normalizeRemoteConfig(parsed.remoteConfig),
-      apiDomains: parseDomainList(
-        parsed.remoteConfig?.api_domains,
-        parsed.remoteConfig?.backup_api_domains,
-        parsed.activeApiDomain,
-      ),
+      remoteConfig,
+      activeApiDomain: apiDomains.includes(parsed.activeApiDomain)
+        ? parsed.activeApiDomain
+        : apiDomains[0],
+      apiDomains,
+      apiRequestDomains,
     }
   } catch {
     return null
@@ -251,20 +259,22 @@ const fetchText = async (url: string, timeoutMs = 2500) => {
   return response.text()
 }
 
-const fetchJson = async <T>(url: string, timeoutMs = 2500): Promise<T> => {
-  const text = await fetchText(url, timeoutMs)
-  return JSON.parse(text) as T
-}
-
 const fetchRemoteEnv = async () => {
   let lastError: unknown
 
   for (const source of XBOARD_REMOTE_CONFIG_URLS) {
     try {
       const text = await fetchText(source)
+      const parsed = parseEnvConfig(text)
+      if (
+        !String(parsed['domains-api'] || '').trim() &&
+        !String(parsed.api_domains || '').trim()
+      ) {
+        throw new Error(`${source} 缺少 domains-api 或 api_domains`)
+      }
       return {
         source,
-        remoteConfig: normalizeRemoteConfig(parseEnvConfig(text)),
+        remoteConfig: normalizeRemoteConfig(parsed),
       }
     } catch (error) {
       lastError = error
@@ -276,78 +286,12 @@ const fetchRemoteEnv = async () => {
     : new Error('远程配置源全部不可达')
 }
 
-const unwrapPayloadData = (payload: any) => {
-  if (payload?.data && typeof payload.data === 'object') {
-    return payload.data
-  }
-  return payload ?? {}
-}
-
-const unwrapBootstrap = (payload: any): XboardBootstrapData => {
-  return unwrapPayloadData(payload) as XboardBootstrapData
-}
-
-const fetchBootstrap = async (domain: string) => {
-  const url = `${domain}/api/v1/app/bootstrap`
-  const payload = await fetchJson<any>(url)
-  return unwrapBootstrap(payload)
-}
-
-const probeDomain = async (domain: string) => {
-  try {
-    return {
-      bootstrap: await fetchBootstrap(domain),
-      compatibleOnly: false,
-    }
-  } catch (bootstrapError) {
-    const guestConfig = unwrapPayloadData(
-      await fetchJson<any>(`${domain}/api/v1/guest/comm/config`),
-    ) as XboardRecord
-
-    return {
-      bootstrap: {
-        app_info: guestConfig,
-        public_ui_config: guestConfig,
-        guest_config: guestConfig,
-        features: {
-          enable_register:
-            guestConfig.enable_register ??
-            guestConfig.register_enable ??
-            guestConfig.is_register,
-          stop_register:
-            guestConfig.stop_register ?? guestConfig.disable_registration,
-          email_gmail_limit_enable:
-            guestConfig.email_gmail_limit_enable ??
-            guestConfig.gmail_alias_limit ??
-            guestConfig.disable_gmail_alias,
-          email_verify: guestConfig.email_verify ?? guestConfig.is_email_verify,
-          invite_force: guestConfig.invite_force ?? guestConfig.is_invite_force,
-          captcha: guestConfig.captcha ?? guestConfig.is_captcha,
-          is_captcha:
-            guestConfig.is_captcha ??
-            guestConfig.captcha_enable ??
-            guestConfig.enable_captcha,
-          captcha_enable:
-            guestConfig.captcha_enable ??
-            guestConfig.is_captcha ??
-            guestConfig.enable_captcha,
-          captcha_type: guestConfig.captcha_type,
-          recaptcha_site_key: guestConfig.recaptcha_site_key,
-          recaptcha_v3_site_key: guestConfig.recaptcha_v3_site_key,
-          turnstile_site_key: guestConfig.turnstile_site_key,
-        },
-      },
-      compatibleOnly: true,
-      error: bootstrapError,
-    }
-  }
-}
-
 export const getCachedXboardConfig = () =>
   readCachedConfig() ?? {
     remoteConfig: XBOARD_SEED_REMOTE_CONFIG,
     activeApiDomain: XBOARD_FALLBACK_API_DOMAIN,
     apiDomains: [XBOARD_FALLBACK_API_DOMAIN],
+    apiRequestDomains: [XBOARD_FALLBACK_API_DOMAIN],
     configSource: 'seed',
     fetchedAt: 0,
     degraded: true,
@@ -365,73 +309,41 @@ export const resolveXboardRemoteConfig = async (
 
   let configSource = cached?.configSource ?? 'seed'
   let remoteConfig = cached?.remoteConfig ?? XBOARD_SEED_REMOTE_CONFIG
-  let remoteError: unknown
-
+  let remoteError: string | undefined
   try {
     const remote = await fetchRemoteEnv()
     remoteConfig = remote.remoteConfig
     configSource = remote.source
   } catch (error) {
-    remoteError = error
+    const message = error instanceof Error ? error.message : String(error)
+    if (cached) {
+      return { ...cached, degraded: true, error: message }
+    }
+    remoteError = message
   }
 
+  const normalizedRemoteConfig = normalizeRemoteConfig(remoteConfig)
   const apiDomains = parseDomainList(
-    remoteConfig.api_domains,
-    remoteConfig.backup_api_domains,
+    normalizedRemoteConfig.api_domains,
+    normalizedRemoteConfig.backup_api_domains,
     cached?.activeApiDomain,
     XBOARD_FALLBACK_API_DOMAIN,
   )
-
-  let bootstrap: XboardBootstrapData | undefined
-  let compatibleOnly = false
-  let activeApiDomain = cached?.activeApiDomain
-    ? normalizeDomain(cached.activeApiDomain)
-    : apiDomains[0]
-  let lastApiError: unknown
-
-  for (const domain of apiDomains) {
-    try {
-      const probe = await probeDomain(domain)
-      bootstrap = probe.bootstrap
-      compatibleOnly = probe.compatibleOnly
-      activeApiDomain = domain
-
-      if (bootstrap?.remote_config) {
-        remoteConfig = normalizeRemoteConfig({
-          ...remoteConfig,
-          ...bootstrap.remote_config,
-        })
-      }
-      break
-    } catch (error) {
-      lastApiError = error
-    }
-  }
-
-  const resolvedDomains = parseDomainList(
-    remoteConfig.api_domains,
-    remoteConfig.backup_api_domains,
-    activeApiDomain,
-    XBOARD_FALLBACK_API_DOMAIN,
+  const apiRequestDomains = parseDomainList(
+    normalizedRemoteConfig['domains-api'],
+    apiDomains,
   )
-
   const result: XboardResolvedConfig = {
-    remoteConfig: normalizeRemoteConfig(remoteConfig),
-    bootstrap,
-    activeApiDomain: activeApiDomain || XBOARD_FALLBACK_API_DOMAIN,
-    apiDomains: resolvedDomains,
+    remoteConfig: normalizedRemoteConfig,
+    activeApiDomain: apiDomains[0] || XBOARD_FALLBACK_API_DOMAIN,
+    apiDomains,
+    apiRequestDomains,
     configSource,
     fetchedAt: now,
-    degraded: !bootstrap || compatibleOnly,
-    error:
-      !bootstrap && (remoteError || lastApiError)
-        ? String((remoteError || lastApiError) as Error)
-        : undefined,
+    degraded: configSource === 'seed',
+    error: remoteError,
   }
 
-  if (bootstrap || !cached) {
-    writeCachedConfig(result)
-  }
-
-  return bootstrap || !cached ? result : { ...cached, error: result.error }
+  if (configSource !== 'seed') writeCachedConfig(result)
+  return result
 }

@@ -1,17 +1,4 @@
-import {
-  AccessTimeRounded,
-  MyLocationRounded,
-  NetworkCheckRounded,
-  FilterAltRounded,
-  FilterAltOffRounded,
-  VisibilityRounded,
-  VisibilityOffRounded,
-  WifiTetheringRounded,
-  WifiTetheringOffRounded,
-  SortByAlphaRounded,
-  SortRounded,
-} from '@mui/icons-material'
-import { Box, IconButton, TextField, SxProps } from '@mui/material'
+import { Box, Button, SxProps } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -57,6 +44,14 @@ export const ProxyHead = ({
 
   const { t } = useTranslation()
   const [autoFocus, setAutoFocus] = useState(false)
+  const sortLabel = [
+    t('proxies.page.tooltips.sortDefault'),
+    t('proxies.page.tooltips.sortDelay'),
+    t('proxies.page.tooltips.sortName'),
+  ][sortType]
+  const detailLabel = showType
+    ? t('proxies.page.tooltips.showBasic')
+    : t('proxies.page.tooltips.showDetail')
 
   useEffect(() => {
     // fix the focus conflict
@@ -74,94 +69,78 @@ export const ProxyHead = ({
   }, [groupName, testUrl, defaultLatencyUrl, url])
 
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ...sx }}>
-      <IconButton
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: 0.5,
+        ...sx,
+      }}
+    >
+      <Button
         size="small"
         color="inherit"
         title={t('proxies.page.tooltips.locate')}
         onClick={onLocation}
+        sx={{ minWidth: 0, px: 1, whiteSpace: 'nowrap' }}
       >
-        <MyLocationRounded />
-      </IconButton>
+        {t('proxies.page.tooltips.locate')}
+      </Button>
 
-      <IconButton
+      <Button
         size="small"
         color="inherit"
         title={t('proxies.page.tooltips.delayCheck')}
         onClick={() => {
           debugLog(`[ProxyHead] 点击延迟测试按钮，组: ${groupName}`)
-          // Remind the user that it is custom test url
-          if (testUrl?.trim() && textState !== 'filter') {
+          if (testUrl?.trim()) {
             debugLog(`[ProxyHead] 使用自定义测试URL: ${testUrl}`)
-            onHeadState({ textState: 'url' })
           }
           onCheckDelay()
         }}
+        sx={{ minWidth: 0, px: 1, whiteSpace: 'nowrap' }}
       >
-        <NetworkCheckRounded />
-      </IconButton>
+        {t('proxies.page.tooltips.delayCheck')}
+      </Button>
 
-      <IconButton
+      <Button
         size="small"
         color="inherit"
-        title={
-          [
-            t('proxies.page.tooltips.sortDefault'),
-            t('proxies.page.tooltips.sortDelay'),
-            t('proxies.page.tooltips.sortName'),
-          ][sortType]
-        }
+        title={sortLabel}
         onClick={() =>
           onHeadState({ sortType: ((sortType + 1) % 3) as ProxySortType })
         }
+        sx={{ minWidth: 0, px: 1, whiteSpace: 'nowrap' }}
       >
-        {sortType !== 1 && sortType !== 2 && <SortRounded />}
-        {sortType === 1 && <AccessTimeRounded />}
-        {sortType === 2 && <SortByAlphaRounded />}
-      </IconButton>
+        {sortLabel}
+      </Button>
 
-      <IconButton
+      <Button
         size="small"
         color="inherit"
-        title={t('proxies.page.tooltips.delayCheckUrl')}
-        onClick={() =>
-          onHeadState({ textState: textState === 'url' ? null : 'url' })
-        }
-      >
-        {textState === 'url' ? (
-          <WifiTetheringRounded />
-        ) : (
-          <WifiTetheringOffRounded />
-        )}
-      </IconButton>
-
-      <IconButton
-        size="small"
-        color="inherit"
-        title={
-          showType
-            ? t('proxies.page.tooltips.showBasic')
-            : t('proxies.page.tooltips.showDetail')
-        }
+        variant={showType ? 'contained' : 'text'}
+        title={detailLabel}
+        aria-pressed={showType}
         onClick={() => onHeadState({ showType: !showType })}
+        sx={{ minWidth: 0, px: 1, whiteSpace: 'nowrap' }}
       >
-        {showType ? <VisibilityRounded /> : <VisibilityOffRounded />}
-      </IconButton>
+        {detailLabel}
+      </Button>
 
-      <IconButton
+      <Button
         size="small"
         color="inherit"
+        variant={textState === 'filter' ? 'contained' : 'text'}
         title={t('proxies.page.tooltips.filter')}
+        aria-pressed={textState === 'filter'}
         onClick={() =>
           onHeadState({ textState: textState === 'filter' ? null : 'filter' })
         }
+        sx={{ minWidth: 0, px: 1, whiteSpace: 'nowrap' }}
       >
-        {textState === 'filter' ? (
-          <FilterAltRounded />
-        ) : (
-          <FilterAltOffRounded />
-        )}
-      </IconButton>
+        {t('proxies.page.tooltips.filter')}
+      </Button>
 
       {textState === 'filter' && (
         <Box sx={{ ml: 0.5, flex: '1 1 auto' }}>
@@ -183,21 +162,6 @@ export const ProxyHead = ({
             }
           />
         </Box>
-      )}
-
-      {textState === 'url' && (
-        <TextField
-          autoComplete="new-password"
-          autoFocus={autoFocus}
-          hiddenLabel
-          autoSave="off"
-          value={testUrl}
-          size="small"
-          variant="outlined"
-          placeholder={t('proxies.page.placeholders.delayCheckUrl')}
-          onChange={(e) => onHeadState({ testUrl: e.target.value })}
-          sx={{ ml: 0.5, flex: '1 1 auto', input: { py: 0.65, px: 1 } }}
-        />
       )}
     </Box>
   )

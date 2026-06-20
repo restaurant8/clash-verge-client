@@ -110,6 +110,24 @@ export function filterSort(
 }
 
 /**
+ * 内置特殊代理（DIRECT / REJECT 等），面向终端用户隐藏，避免在节点列表里出现。
+ */
+const HIDDEN_SPECIAL_PROXY_TYPES = new Set([
+  'direct',
+  'reject',
+  'rejectdrop',
+  'pass',
+  'compatible',
+])
+
+const isHiddenSpecialProxy = (proxy: IProxyItem) =>
+  HIDDEN_SPECIAL_PROXY_TYPES.has(
+    String(proxy?.type ?? '')
+      .replace(/[-_\s]/g, '')
+      .toLowerCase(),
+  )
+
+/**
  * 可以通过延迟数/节点类型 过滤
  */
 const regex1 = /delay([=<>])(\d+|timeout|error)/i
@@ -125,8 +143,9 @@ function filterProxies(
   filterText: string,
   searchState?: ProxySearchState,
 ) {
+  const source = proxies.filter((p) => !isHiddenSpecialProxy(p))
   const query = filterText.trim()
-  if (!query) return proxies
+  if (!query) return source
 
   const res1 = regex1.exec(query)
   if (res1) {
@@ -135,7 +154,7 @@ function filterProxies(
     const value =
       symbol2 === 'error' ? 1e5 : symbol2 === 'timeout' ? 3000 : +symbol2
 
-    return proxies.filter((p) => {
+    return source.filter((p) => {
       const delay = delayManager.getDelayFix(p, groupName)
 
       if (delay < 0) return false
@@ -152,7 +171,7 @@ function filterProxies(
   const res2 = regex2.exec(query)
   if (res2) {
     const type = res2[1].toLowerCase()
-    return proxies.filter((p) => p.type.toLowerCase().includes(type))
+    return source.filter((p) => p.type.toLowerCase().includes(type))
   }
 
   const {
@@ -167,7 +186,7 @@ function filterProxies(
   })
 
   if (!compiled.isValid) return []
-  return proxies.filter((p) => compiled.matcher(p.name))
+  return source.filter((p) => compiled.matcher(p.name))
 }
 
 /**

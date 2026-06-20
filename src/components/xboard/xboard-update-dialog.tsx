@@ -74,8 +74,11 @@ export const XboardUpdateDialog = () => {
 
   const open = update.forceUpdate || dismissedVersion !== update.latestVersion
 
-  const handleDownload = () => {
-    if (update.downloadUrl) void openWebUrl(update.downloadUrl)
+  // macOS 可能提供两个架构的下载（Apple 芯片 / Intel）；此时让用户自行选择。
+  const multiArch = update.downloads.length > 1
+
+  const handleDownload = (url: string) => {
+    if (url) void openWebUrl(url)
     // Keep the dialog up on force updates so the user can't bypass it.
     if (!update.forceUpdate) setDismissedVersion(update.latestVersion)
   }
@@ -117,6 +120,25 @@ export const XboardUpdateDialog = () => {
               此为强制更新，需更新后才能继续使用。
             </Typography>
           )}
+          {multiArch && (
+            <Stack spacing={1} sx={{ pt: 0.5 }}>
+              <Typography variant="body2" color="text.secondary">
+                请选择你的 Mac 芯片下载（苹果菜单 →
+                「关于本机」可查看芯片型号）：
+              </Typography>
+              {update.downloads.map((option) => (
+                <Button
+                  key={option.url}
+                  variant="contained"
+                  disableElevation
+                  fullWidth
+                  onClick={() => handleDownload(option.url)}
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </Stack>
+          )}
         </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 2.5, py: 1.5, justifyContent: 'flex-end' }}>
@@ -134,14 +156,16 @@ export const XboardUpdateDialog = () => {
             </Button>
           </>
         )}
-        <Button
-          variant="contained"
-          disableElevation
-          disabled={!update.downloadUrl}
-          onClick={handleDownload}
-        >
-          立即更新
-        </Button>
+        {!multiArch && (
+          <Button
+            variant="contained"
+            disableElevation
+            disabled={!update.downloadUrl}
+            onClick={() => handleDownload(update.downloadUrl)}
+          >
+            立即更新
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   )

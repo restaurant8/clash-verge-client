@@ -736,8 +736,12 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
       const cachedTokensPromise = getCachedXboardSubscriptionTokens().catch(
         () => [] as string[],
       )
+
+      // 缓存优先：立即解除整页“正在准备登录环境”遮罩，不再每次启动都被
+      // 远程配置拉取 + 登录态校验阻塞。已登录则用本地缓存会话直接进入界面，
+      // 登录态校验在后台进行；若校验发现 token 失效会自动登出并跳回登录页。
+      setBooting(false)
       if (!storedSession) {
-        setBooting(false)
         void cachedTokensPromise.then((tokens) => {
           tokens.forEach((token) =>
             cachedSubscriptionTokensRef.current.add(token),
@@ -775,18 +779,14 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
           await startupClient.checkLogin(storedSession.authData)
           if (cancelled) return
 
-          // 默认使用缓存：已有缓存订阅且距上次拉取不足 2 小时，则跳过本次后台重拉，
-          // 直接沿用本地缓存配置（内核已用缓存启动）。超过冷却或没有缓存才后台更新。
+          // 账号信息（套餐/节点/流量）每次启动都刷新，避免误显示“待开通/无节点”。
+          // 仅对“重拉订阅 YAML + 重写 profile + 重载内核”这件重活做 2 小时冷却：
+          // 已有缓存订阅且距上次拉取不足 2 小时时，沿用本地缓存配置，跳过重拉。
           const lastSyncedAt = readSubscriptionSyncAt()
-          const withinCooldown =
+          const skipProfilePull =
+            hasCachedSubscription &&
             lastSyncedAt !== null &&
             Date.now() - lastSyncedAt < SUBSCRIPTION_SYNC_COOLDOWN_MS
-
-          if (hasCachedSubscription && withinCooldown) {
-            setSubscriptionInitialization({ status: 'idle' })
-            setBooting(false)
-            return
-          }
 
           if (!hasCachedSubscription) {
             setSubscriptionInitialization({ status: 'loading' })
@@ -804,6 +804,16 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
               applySnapshot(snapshot)
               if (!snapshot.servers.length) {
                 setSubscriptionInitialization({ status: 'idle' })
+                return
+              }
+
+              if (skipProfilePull) {
+                // 冷却期内：账号信息已刷新，订阅节点沿用本地缓存，不重拉。
+                cachedSubscriptionTokensRef.current.add(
+                  snapshot.session.subscribeToken,
+                )
+                setSubscriptionInitialization({ status: 'idle' })
+                setLastError(undefined)
                 return
               }
 

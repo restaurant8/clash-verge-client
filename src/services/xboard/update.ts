@@ -9,17 +9,69 @@ import type { XboardRemoteConfig } from './types'
  */
 export const XBOARD_CHECK_UPDATE_EVENT = 'muacloud-check-update'
 
+export interface XboardDownloadOption {
+  /** User-facing label, e.g. "Apple 芯片" / "Intel 芯片". */
+  label: string
+  /** Download URL for this option. */
+  url: string
+}
+
 export interface XboardClientUpdate {
   /** Platform key the update was resolved for. */
   platform: 'windows' | 'macos'
   /** Newer version advertised by the remote config. */
   latestVersion: string
-  /** Where to download the new build. */
+  /** Primary download URL (first of {@link downloads}); kept for back-compat. */
   downloadUrl: string
+  /**
+   * One or more download choices. macOS may expose two (Apple Silicon / Intel)
+   * when the remote config provides arch-specific URLs; otherwise a single one.
+   */
+  downloads: XboardDownloadOption[]
   /** Optional release notes. */
   notes: string
   /** When true the user must update before continuing. */
   forceUpdate: boolean
+}
+
+/** First non-empty trimmed string among the candidates, or '' if none. */
+const firstUrl = (...candidates: unknown[]): string => {
+  for (const value of candidates) {
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return ''
+}
+
+/**
+ * Build the macOS download choices. When the remote config provides
+ * arch-specific URLs (Apple Silicon and/or Intel) they are offered separately
+ * so the user picks the build matching their chip — arch can't be reliably
+ * auto-detected from the webview. Falls back to the single `macos_download_url`.
+ */
+const resolveMacDownloads = (
+  remoteConfig: XboardRemoteConfig,
+): XboardDownloadOption[] => {
+  const arm = firstUrl(
+    remoteConfig.macos_arm64_download_url,
+    remoteConfig.macos_aarch64_download_url,
+    remoteConfig.macos_apple_silicon_download_url,
+  )
+  const intel = firstUrl(
+    remoteConfig.macos_intel_download_url,
+    remoteConfig.macos_x64_download_url,
+    remoteConfig.macos_x86_64_download_url,
+  )
+
+  const downloads: XboardDownloadOption[] = []
+  if (arm) downloads.push({ label: 'Apple 芯片（M 系列）', url: arm })
+  if (intel) downloads.push({ label: 'Intel 芯片', url: intel })
+  if (downloads.length) return downloads
+
+  const single = firstUrl(
+    remoteConfig.macos_download_url,
+    remoteConfig.latest_client_url,
+  )
+  return single ? [{ label: '立即更新', url: single }] : []
 }
 
 /**
@@ -68,11 +120,18 @@ export const resolveClientUpdate = (
     ).trim() || remoteConfig.version.trim()
   if (!latest || compareVersions(latest, currentVersion) <= 0) return null
 
-  const downloadUrl =
-    (platform === 'windows'
-      ? remoteConfig.windows_download_url
-      : remoteConfig.macos_download_url
-    ).trim() || remoteConfig.latest_client_url.trim()
+  const downloads =
+    platform === 'windows'
+      ? (() => {
+          const url = firstUrl(
+            remoteConfig.windows_download_url,
+            remoteConfig.latest_client_url,
+          )
+          return url ? [{ label: '立即更新', url }] : []
+        })()
+      : resolveMacDownloads(remoteConfig)
+
+  const downloadUrl = downloads[0]?.url ?? ''
 
   const notes =
     (platform === 'windows'
@@ -85,5 +144,12 @@ export const resolveClientUpdate = (
       ? remoteConfig.windows_force_update
       : remoteConfig.macos_force_update
 
-  return { platform, latestVersion: latest, downloadUrl, notes, forceUpdate }
+  return {
+    platform,
+    latestVersion: latest,
+    downloadUrl,
+    downloads,
+    notes,
+    forceUpdate,
+  }
 }

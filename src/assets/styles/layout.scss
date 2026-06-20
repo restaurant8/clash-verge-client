@@ -48,9 +48,11 @@
       background: var(--surface-color);
 
       .the-logo {
+        // 顶部品牌区域隐藏：窗口标题栏已有品牌，侧边栏不再重复显示。
+        display: none;
+
         position: relative;
-        flex: 1 0 58px;
-        display: flex;
+        flex: 0 0 58px;
         height: 100%;
         padding: 0 20px;
         flex-direction: column;
@@ -65,13 +67,10 @@
         }
 
         .brand-logo {
-          width: 36px;
-          height: 36px;
-          margin-right: 10px;
-          flex: 0 0 36px;
-          border-radius: 8px;
-          object-fit: cover;
-          box-shadow: 0 8px 22px rgba(15, 118, 110, 0.16);
+          width: auto;
+          height: 30px;
+          max-width: 100%;
+          object-fit: contain;
         }
 
         .brand-text {
@@ -112,10 +111,15 @@
       }
 
       .the-menu {
-        flex: 1 1 80%;
+        // 撑满 logo(已隐藏)与流量图之间的空间，菜单项均匀分布、自适应窗口高度，
+        // 避免下方留白。
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-evenly;
         overflow-y: auto;
         margin-bottom: 0px;
-        padding-top: 4px;
+        padding: 8px 0;
         scrollbar-width: none;
 
         .MuiListItemButton-root {

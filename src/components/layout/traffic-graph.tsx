@@ -4,9 +4,6 @@ import { Traffic } from 'tauri-plugin-mihomo-api'
 
 const maxPoint = 30
 
-const refLineAlpha = 1
-const refLineWidth = 2
-
 const upLineAlpha = 0.6
 const upLineWidth = 4
 
@@ -97,8 +94,7 @@ export function TrafficGraph({ ref }: { ref?: Ref<TrafficRef> }) {
 
     if (!context) return
 
-    const { primary, secondary, divider } = palette
-    const refLineColor = divider || 'rgba(0, 0, 0, 0.12)'
+    const { primary, secondary } = palette
     const upLineColor = secondary.main || '#9c27b0'
     const downLineColor = primary.main || '#5b5c9d'
 
@@ -122,8 +118,6 @@ export function TrafficGraph({ ref }: { ref?: Ref<TrafficRef> }) {
       const height = canvas.height
       const dx = width / maxPoint
       const dy = height / 7
-      const l1 = dy
-      const l2 = dy * 4
 
       const countY = (v: number) => {
         const h = height
@@ -173,18 +167,6 @@ export function TrafficGraph({ ref }: { ref?: Ref<TrafficRef> }) {
       }
 
       context.clearRect(0, 0, width, height)
-
-      // Reference lines
-      context.beginPath()
-      context.globalAlpha = refLineAlpha
-      context.lineWidth = refLineWidth
-      context.strokeStyle = refLineColor
-      context.moveTo(0, l1)
-      context.lineTo(width, l1)
-      context.moveTo(0, l2)
-      context.lineTo(width, l2)
-      context.stroke()
-      context.closePath()
 
       context.beginPath()
       context.globalAlpha = upLineAlpha

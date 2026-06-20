@@ -58,7 +58,8 @@ type NavItem = (typeof navItems)[number]
 
 type MenuContextPosition = { top: number; left: number }
 
-const SETTINGS_ENTRY_PATHS = new Set(['/settings', '/advanced'])
+// 仅“高级”保留隐藏（5 次点击账户解锁）；“设置”直接显示在导航中。
+const SETTINGS_ENTRY_PATHS = new Set(['/advanced'])
 const SETTINGS_UNLOCK_STORAGE_KEY = 'muacloud:settings-menu-unlocked'
 const SETTINGS_UNLOCK_CLICK_COUNT = 5
 const SETTINGS_UNLOCK_CLICK_WINDOW_MS = 2000
@@ -265,7 +266,7 @@ const Layout = () => {
         accountMenuClickRef.current = { count: 0, lastAt: 0 }
         setSettingsMenuUnlocked(true)
         window.sessionStorage.setItem(SETTINGS_UNLOCK_STORAGE_KEY, '1')
-        return '/settings'
+        return '/advanced'
       }
 
       return undefined

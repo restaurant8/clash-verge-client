@@ -28,7 +28,7 @@ import { useLockFn } from 'ahooks'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
-import brandLogo from '@/assets/image/muacloud-logo.svg'
+import brandLogo from '@/assets/image/muacloud-icon.png'
 import { ClashModeCard } from '@/components/home/clash-mode-card'
 import { EnhancedCard } from '@/components/home/enhanced-card'
 import { ProxyTunCard } from '@/components/home/proxy-tun-card'

@@ -29,8 +29,10 @@ import {
 } from '@/services/xboard/remote-config'
 import {
   clearXboardSession,
+  readSubscriptionSyncAt,
   readXboardSession,
   saveXboardSession,
+  writeSubscriptionSyncAt,
 } from '@/services/xboard/session'
 import {
   ensureXboardSubscriptionProfile,
@@ -86,6 +88,13 @@ const extractSubscribeToken = (...values: any[]) => {
 const createEmptyResourceCache = (): XboardResourceCache => ({
   ticketDetails: {},
 })
+
+/**
+ * Cooldown between automatic startup subscription re-pulls. Within this window
+ * the app boots straight from the cached profile instead of re-fetching the
+ * subscription on every launch. Manual "刷新订阅" always bypasses this.
+ */
+const SUBSCRIPTION_SYNC_COOLDOWN_MS = 2 * 60 * 60 * 1000
 
 type SubscriptionInitializationState = {
   status: 'idle' | 'loading' | 'error'
@@ -209,12 +218,15 @@ const loadSubscriptionProfile = async (
     throw new Error('当前账号没有可用节点，请先购买套餐或联系客服')
   }
 
-  return ensureXboardSubscriptionProfile(
+  const uid = await ensureXboardSubscriptionProfile(
     client,
     snapshot.session.subscribeToken,
     remoteConfig,
     snapshot.subscribeInfo,
   )
+  // 记录成功拉取订阅的时间，供启动时的 2 小时冷却判断使用。
+  writeSubscriptionSyncAt(Date.now())
+  return uid
 }
 
 export const XboardProvider = ({ children }: { children: ReactNode }) => {
@@ -762,6 +774,20 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
 
           await startupClient.checkLogin(storedSession.authData)
           if (cancelled) return
+
+          // 默认使用缓存：已有缓存订阅且距上次拉取不足 2 小时，则跳过本次后台重拉，
+          // 直接沿用本地缓存配置（内核已用缓存启动）。超过冷却或没有缓存才后台更新。
+          const lastSyncedAt = readSubscriptionSyncAt()
+          const withinCooldown =
+            lastSyncedAt !== null &&
+            Date.now() - lastSyncedAt < SUBSCRIPTION_SYNC_COOLDOWN_MS
+
+          if (hasCachedSubscription && withinCooldown) {
+            setSubscriptionInitialization({ status: 'idle' })
+            setBooting(false)
+            return
+          }
+
           if (!hasCachedSubscription) {
             setSubscriptionInitialization({ status: 'loading' })
           }

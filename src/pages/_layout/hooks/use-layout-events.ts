@@ -50,6 +50,8 @@ export const useLayoutEvents = (
           'getClashMode',
           'getRuntimeConfig',
           'getProxyProviders',
+          'getRules',
+          'getRuleProviders',
         ])
       }),
     )

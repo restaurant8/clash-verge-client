@@ -34,6 +34,7 @@ notifications:
 service:
   adminInstallPrompt: MuaCloud hizmetini kurmak için yönetici ayrıcalıkları gerekir.
   adminUninstallPrompt: MuaCloud hizmetini kaldırmak için yönetici ayrıcalıkları gerekir.
+  translocatedCorePath: MuaCloud is running from a temporary (App Translocation) path and can't locate the core. Please move MuaCloud into the Applications folder and reopen it.
 tray:
   dashboard: Gösterge Paneli
   ruleMode: Kural Modu

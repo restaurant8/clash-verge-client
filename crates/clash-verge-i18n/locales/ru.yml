@@ -34,6 +34,7 @@ notifications:
 service:
   adminInstallPrompt: Для установки службы MuaCloud требуются права администратора.
   adminUninstallPrompt: Для удаления службы MuaCloud требуются права администратора.
+  translocatedCorePath: MuaCloud is running from a temporary (App Translocation) path and can't locate the core. Please move MuaCloud into the Applications folder and reopen it.
 tray:
   dashboard: Панель
   ruleMode: Режим правил

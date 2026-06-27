@@ -34,6 +34,7 @@ notifications:
 service:
   adminInstallPrompt: 安裝 MuaCloud 服務需要管理員權限
   adminUninstallPrompt: 卸载 MuaCloud 服務需要管理員權限
+  translocatedCorePath: MuaCloud is running from a temporary (App Translocation) path and can't locate the core. Please move MuaCloud into the Applications folder and reopen it.
 tray:
   dashboard: 儀表板
   ruleMode: 規則模式

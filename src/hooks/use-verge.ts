@@ -16,6 +16,7 @@ export const useVerge = () => {
       return config
     },
     initialData: initialVergeConfig ?? undefined,
+    revalidateOnMount: initialVergeConfig ? false : undefined,
     staleTime: 5000,
   })
 

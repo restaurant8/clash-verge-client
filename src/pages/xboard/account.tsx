@@ -72,6 +72,7 @@ const AccountPage = () => {
     remote,
     refreshAccount,
     logout,
+    accountHydrated,
   } = useXboard()
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState<'success' | 'error' | 'info'>(
@@ -282,7 +283,10 @@ const AccountPage = () => {
           <Grid size={{ xs: 12, sm: 6, md: 4 }}>
             <XboardMetric
               label="套餐"
-              value={subscribeInfo?.plan?.name ?? '未开通'}
+              value={
+                subscribeInfo?.plan?.name ??
+                (accountHydrated ? '未开通' : '同步中…')
+              }
             />
           </Grid>
           <Grid size={{ xs: 12, sm: 6, md: 4 }}>
@@ -388,7 +392,11 @@ const AccountPage = () => {
                 gap: 2,
               }}
             >
-              <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center' }}>
+              <Stack
+                direction="row"
+                spacing={1.2}
+                sx={{ alignItems: 'center' }}
+              >
                 <NotificationsRounded color="action" />
                 <Typography>到期邮件提醒</Typography>
               </Stack>
@@ -408,7 +416,11 @@ const AccountPage = () => {
                 gap: 2,
               }}
             >
-              <Stack direction="row" spacing={1.2} sx={{ alignItems: 'center' }}>
+              <Stack
+                direction="row"
+                spacing={1.2}
+                sx={{ alignItems: 'center' }}
+              >
                 <AccountBalanceWalletRounded color="action" />
                 <Typography>流量邮件提醒</Typography>
               </Stack>

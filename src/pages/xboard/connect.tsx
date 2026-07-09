@@ -1267,8 +1267,15 @@ const AuthPanel = () => {
 
 const ConnectPage = () => {
   const navigate = useNavigate()
-  const { session, userInfo, subscribeInfo, servers, booting, connection } =
-    useXboard()
+  const {
+    session,
+    userInfo,
+    subscribeInfo,
+    servers,
+    booting,
+    connection,
+    accountHydrated,
+  } = useXboard()
 
   const used = Number(subscribeInfo?.u ?? 0) + Number(subscribeInfo?.d ?? 0)
   const total = Number(subscribeInfo?.transfer_enable ?? 0)
@@ -1307,7 +1314,8 @@ const ConnectPage = () => {
         {connection.status === 'error' && connection.message && (
           <Alert severity="error">{connection.message}</Alert>
         )}
-        {!hasServers && (
+        {/* 远程账号信息未落地前不显示"无节点"告警，避免启动时误报 */}
+        {accountHydrated && !hasServers && (
           <Alert
             severity="warning"
             action={
@@ -1367,8 +1375,20 @@ const ConnectPage = () => {
           title="账户摘要"
           action={
             <XboardStatusChip
-              status={subscribeInfo?.expired_at ? 'success' : 'warning'}
-              label={subscribeInfo?.expired_at ? '权益有效' : '待开通'}
+              status={
+                subscribeInfo?.expired_at
+                  ? 'success'
+                  : accountHydrated
+                    ? 'warning'
+                    : 'default'
+              }
+              label={
+                subscribeInfo?.expired_at
+                  ? '权益有效'
+                  : accountHydrated
+                    ? '待开通'
+                    : '同步中'
+              }
             />
           }
           sx={{ p: 2.25 }}
@@ -1387,7 +1407,8 @@ const ConnectPage = () => {
                 {userInfo?.email ?? session.email ?? '已登录账户'}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {subscribeInfo?.plan?.name ?? '未开通套餐'}
+                {subscribeInfo?.plan?.name ??
+                  (accountHydrated ? '未开通套餐' : '账号信息同步中…')}
               </Typography>
             </Box>
             <XboardTrafficBar used={used} total={total} />

@@ -2,11 +2,13 @@ import AccountCircleRoundedIcon from '@mui/icons-material/AccountCircleRounded'
 import EqualizerRoundedIcon from '@mui/icons-material/EqualizerRounded'
 import HomeRoundedIcon from '@mui/icons-material/HomeRounded'
 import HubRoundedIcon from '@mui/icons-material/HubRounded'
+import LanguageRoundedIcon from '@mui/icons-material/LanguageRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded'
 import ShoppingCartRoundedIcon from '@mui/icons-material/ShoppingCartRounded'
 import SupportAgentRoundedIcon from '@mui/icons-material/SupportAgentRounded'
 
+import ConnectionsPage from './connections'
 import SettingsPage from './settings-entry'
 import AccountPage from './xboard/account'
 import AdvancedSettingsPage from './xboard/advanced-entry'
@@ -53,6 +55,12 @@ export const navItems = [
     path: '/traffic-records',
     icon: [<EqualizerRoundedIcon key="mui" />],
     Component: TrafficRecordsPage,
+  },
+  {
+    label: '连接',
+    path: '/connections',
+    icon: [<LanguageRoundedIcon key="mui" />],
+    Component: ConnectionsPage,
   },
   {
     label: '账户',

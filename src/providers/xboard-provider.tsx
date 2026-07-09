@@ -246,6 +246,8 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
   )
   const [booting, setBooting] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  // 首次账号快照是否已落地；未落地前 UI 不应把空数据当成"待开通/已过期"
+  const [accountHydrated, setAccountHydrated] = useState(false)
   const [lastError, setLastError] = useState<string | undefined>()
   const [connection, setConnection] = useState<XboardConnectionState>({
     status: 'disconnected',
@@ -283,6 +285,7 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
     setServers(snapshot.servers)
     setAppConfig(snapshot.appConfig)
     setNotices(snapshot.notices)
+    setAccountHydrated(true)
   }, [])
 
   const syncSubscriptionProfile = useCallback(
@@ -319,6 +322,7 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
     setServers([])
     setAppConfig(undefined)
     setNotices([])
+    setAccountHydrated(false)
     setConnection({ status: 'disconnected' })
     setRefreshing(false)
     setSubscriptionInitialization({ status: 'idle' })
@@ -505,6 +509,7 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
       setServers([])
       setAppConfig(undefined)
       setNotices([])
+      setAccountHydrated(false)
       setSession(nextSession)
       saveXboardSession(nextSession)
       setRefreshing(false)
@@ -874,6 +879,7 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
       resourceCache,
       booting,
       refreshing,
+      accountHydrated,
       connection,
       lastError,
       refreshRemoteConfig,
@@ -891,6 +897,7 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
       disconnect,
     }),
     [
+      accountHydrated,
       appConfig,
       booting,
       client,

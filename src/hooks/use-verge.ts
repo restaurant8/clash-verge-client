@@ -16,7 +16,8 @@ export const useVerge = () => {
       return config
     },
     initialData: initialVergeConfig ?? undefined,
-    revalidateOnMount: initialVergeConfig ? false : undefined,
+    // 上游 swr 封装用 revalidateOnMount；TanStack Query 对应 refetchOnMount
+    refetchOnMount: initialVergeConfig ? false : undefined,
     staleTime: 5000,
   })
 

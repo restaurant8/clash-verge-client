@@ -91,34 +91,10 @@ impl TrayState {
 
     #[allow(clippy::missing_const_for_fn)]
     fn default_icon(verge: &IVerge, kind: IconKind) -> (bool, Cow<'_, [u8]>) {
-        #[cfg(target_os = "macos")]
-        {
-            let is_mono = verge.tray_icon.as_deref().unwrap_or("monochrome") == "monochrome";
-            if is_mono {
-                return (
-                    false,
-                    match kind {
-                        IconKind::Common => Cow::Borrowed(include_bytes!("../../../icons/tray-icon-mono.ico")),
-                        IconKind::SysProxy => {
-                            Cow::Borrowed(include_bytes!("../../../icons/tray-icon-sys-mono-new.ico"))
-                        }
-                        IconKind::Tun => Cow::Borrowed(include_bytes!("../../../icons/tray-icon-tun-mono-new.ico")),
-                    },
-                );
-            }
-        }
-
-        #[cfg(not(target_os = "macos"))]
-        let _ = verge;
-
-        (
-            false,
-            match kind {
-                IconKind::Common => Cow::Borrowed(include_bytes!("../../../icons/tray-icon.ico")),
-                IconKind::SysProxy => Cow::Borrowed(include_bytes!("../../../icons/tray-icon-sys.ico")),
-                IconKind::Tun => Cow::Borrowed(include_bytes!("../../../icons/tray-icon-tun.ico")),
-            },
-        )
+        // Windows 托盘与 macOS 状态栏统一使用品牌"钥匙"应用图标。
+        // 原 tray-icon-*.ico 为同一占位文件，且在 macOS 模板模式下渲染为空白方框。
+        let _ = (verge, kind);
+        (false, Cow::Borrowed(include_bytes!("../../../icons/icon.ico")))
     }
 }
 
@@ -249,16 +225,9 @@ impl Tray {
 
         let (_is_custom_icon, icon_bytes) = TrayState::get_tray_icon(verge).await;
 
-        let template = {
-            #[cfg(target_os = "macos")]
-            {
-                verge.tray_icon.as_ref().is_none_or(|v| v == "monochrome")
-            }
-            #[cfg(not(target_os = "macos"))]
-            {
-                false
-            }
-        };
+        // 品牌彩色图标必须以非模板模式渲染：macOS 模板模式只取 alpha 通道，
+        // 不透明的彩色图标会被涂成纯色方框
+        let template = false;
         let icon = Some(tauri::image::Image::from_bytes(&icon_bytes)?);
 
         logging_error!(Type::Tray, tray.set_icon_with_as_template(icon, template));
@@ -370,11 +339,6 @@ impl Tray {
 
         #[cfg(not(target_os = "linux"))]
         let mut builder = TrayIconBuilder::with_id(TRAY_ID).icon(icon).icon_as_template(false);
-        #[cfg(target_os = "macos")]
-        {
-            let is_monochrome = verge.tray_icon.as_ref().is_none_or(|v| v == "monochrome");
-            builder = builder.icon_as_template(is_monochrome);
-        }
 
         #[cfg(any(target_os = "macos", target_os = "windows"))]
         {

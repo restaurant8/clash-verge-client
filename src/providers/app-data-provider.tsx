@@ -156,6 +156,10 @@ export const AppDataProvider = ({
       refreshProxy().catch(() => {})
     }
 
+    const handleRefreshProfiles = () => {
+      void queryClient.invalidateQueries({ queryKey: ['getProfiles'] })
+    }
+
     const initializeListeners = async () => {
       try {
         const unlistenProfile = await listen<string>(
@@ -165,6 +169,16 @@ export const AppDataProvider = ({
         cleanupFns.push(unlistenProfile)
       } catch (error) {
         console.error('[AppDataProvider] 监听 Profile 事件失败:', error)
+      }
+
+      try {
+        const unlistenProfiles = await listen(
+          'muacloud://refresh-profiles',
+          handleRefreshProfiles,
+        )
+        cleanupFns.push(unlistenProfiles)
+      } catch (error) {
+        console.error('[AppDataProvider] 监听 Profiles 刷新事件失败:', error)
       }
 
       try {

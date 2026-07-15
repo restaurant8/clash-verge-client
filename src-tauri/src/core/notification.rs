@@ -9,6 +9,7 @@ use tauri::{Emitter as _, WebviewWindow};
 pub enum FrontendEvent<'a> {
     RefreshClash,
     RefreshVerge,
+    RefreshProfiles,
     NoticeMessage { status: &'a str, message: String },
     ProfileChanged { current_profile_id: &'a String },
     TimerUpdated { profile_index: &'a String },
@@ -34,6 +35,7 @@ impl NotificationSystem {
         match event {
             FrontendEvent::RefreshClash => ("muacloud://refresh-clash-config", Ok(json!("yes"))),
             FrontendEvent::RefreshVerge => ("muacloud://refresh-verge-config", Ok(json!("yes"))),
+            FrontendEvent::RefreshProfiles => ("muacloud://refresh-profiles", Ok(json!("yes"))),
             FrontendEvent::NoticeMessage { status, message } => {
                 ("muacloud://notice-message", serde_json::to_value((status, message)))
             }

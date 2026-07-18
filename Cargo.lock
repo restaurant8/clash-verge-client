@@ -4364,6 +4364,7 @@ dependencies = [
  "warp",
  "webpki-roots",
  "windows 0.61.3",
+ "windows-sys 0.61.2",
  "winreg 0.56.0",
  "zip 8.6.0",
 ]

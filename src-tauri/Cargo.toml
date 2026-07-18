@@ -106,6 +106,7 @@ webpki-roots = "1.0.7"
 rust_iso3166 = "0.1.14"
 # Use the git repo until the next release after v2.0.0.
 dark-light = { git = "https://github.com/rust-dark-light/dark-light" }
+windows-sys.workspace = true
 bytes = "1.11.1"
 tokio-util = { version = "0.7.18", features = ["time"] }
 

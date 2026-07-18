@@ -16,8 +16,8 @@ use crate::{
     feat,
     utils::{dirs, help},
 };
-use clash_verge_draft::SharedDraft;
-use clash_verge_logging::{Type, logging};
+use clash_verge_draft::{Draft, SharedDraft};
+use clash_verge_logging::{Type, logging, logging_error};
 use scopeguard::defer;
 use smartstring::alias::String;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -83,20 +83,17 @@ pub async fn import_profile(url: std::string::String, option: Option<PrfOption>)
         }
     };
 
-    match profiles_append_item_safe(item).await {
-        Ok(_) => match profiles_save_file_safe().await {
-            Ok(_) => {
-                logging!(info, Type::Cmd, "[导入订阅] 配置文件保存成功");
-            }
-            Err(e) => {
-                logging!(error, Type::Cmd, "[导入订阅] 保存配置文件失败: {}", e);
-            }
-        },
-        Err(e) => {
-            logging!(error, Type::Cmd, "[导入订阅] 保存配置失败: {}", e);
-            return Err(format!("导入订阅失败: {}", e).into());
-        }
+    if let Err(e) = profiles_append_item_safe(item).await {
+        logging!(error, Type::Cmd, "[导入订阅] 保存配置失败: {}", e);
+        return Err(format!("导入订阅失败: {}", e).into());
     }
+
+    if let Err(e) = profiles_save_file_safe().await {
+        logging!(error, Type::Cmd, "[导入订阅] 保存配置文件失败: {}", e);
+        return Err(format!("导入订阅失败: {}", e).into());
+    }
+    logging!(info, Type::Cmd, "[导入订阅] 配置文件保存成功");
+    logging_error!(Type::Timer, Timer::global().refresh().await);
 
     if let Some(uid) = &item.uid {
         logging!(info, Type::Cmd, "[导入订阅] 发送配置变更通知: {}", uid);
@@ -129,9 +126,12 @@ pub async fn create_profile(item: PrfItem, file_data: Option<String>) -> CmdResu
     match profiles_append_item_with_filedata_safe(&item, file_data).await {
         Ok(uid) => {
             profiles_save_file_safe().await.stringify_err()?;
+            // 上游 4b04d035: 新建订阅后刷新定时器, 让导入的订阅进入自动更新调度
+            logging_error!(Type::Timer, Timer::global().refresh().await);
             logging!(info, Type::Cmd, "[创建订阅] 发送配置变更通知: {}", uid);
             let notify_uid: String = uid.clone().into();
             handle::Handle::notify_profile_changed(&notify_uid);
+            // fork 定制: 返回 uid 供 xboard 订阅流程定位新建的 profile
             Ok(uid)
         }
         Err(err) => match err.to_string().as_str() {
@@ -209,8 +209,28 @@ async fn restore_previous_profile(prev_profile: &String) -> CmdResult<()> {
     Ok(())
 }
 
+async fn commit_current_profile(profiles: &Draft<IProfiles>, current: Option<String>) -> anyhow::Result<()> {
+    profiles.discard();
+    let Some(current) = current else {
+        return Ok(());
+    };
+
+    profiles
+        .with_data_modify(|mut committed| async move {
+            committed.patch_config(&IProfiles {
+                current: Some(current),
+                items: None,
+            });
+            Ok((committed, ()))
+        })
+        .await
+}
+
 async fn handle_success(current_value: Option<&String>) -> CmdResult<ValidationOutcome> {
-    Config::profiles().await.apply();
+    commit_current_profile(&Config::profiles().await, current_value.cloned())
+        .await
+        .stringify_err()?;
+    // Runtime refresh and tray rebuilding happen after saved node selections are restored.
     profiles::activate_selected_nodes().stringify_err()?;
     handle::Handle::refresh_clash();
 
@@ -403,4 +423,45 @@ pub async fn get_next_update_time(uid: String) -> CmdResult<Option<i64>> {
     let timer = Timer::global();
     let next_time = timer.get_next_update_time(&uid).await;
     Ok(next_time)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::commit_current_profile;
+    use crate::config::{IProfiles, PrfItem};
+    use clash_verge_draft::Draft;
+
+    fn profile(uid: &str) -> PrfItem {
+        PrfItem {
+            uid: Some(uid.into()),
+            ..PrfItem::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn committing_profile_switch_preserves_profiles_added_after_draft_creation() -> anyhow::Result<()> {
+        let profiles = Draft::new(IProfiles {
+            current: Some("a".into()),
+            items: Some(vec![profile("a"), profile("b")]),
+        });
+        profiles.edit_draft(|draft| {
+            draft.patch_config(&IProfiles {
+                current: Some("b".into()),
+                items: None,
+            });
+        });
+        profiles
+            .with_data_modify(|mut committed| async move {
+                committed.items.get_or_insert_with(Vec::new).push(profile("new"));
+                Ok((committed, ()))
+            })
+            .await?;
+
+        commit_current_profile(&profiles, Some("b".into())).await?;
+
+        let committed = profiles.data_arc();
+        assert_eq!(committed.current.as_deref(), Some("b"));
+        assert!(committed.get_item("new").is_ok());
+        Ok(())
+    }
 }

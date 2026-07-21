@@ -7,9 +7,9 @@ rust-version = "1.91"
 [dependencies]
 clash-verge-logging = { workspace = true }
 log = { workspace = true }
-# 显式声明本 crate 实际用到的 tokio features（signal 监听、current_thread
-# runtime + block_on、select! 宏），保证单独编译不依赖 workspace 特性合并。
-tokio = { workspace = true, features = ["signal", "rt", "macros"] }
+# 显式声明本 crate 实际用到的 tokio features（signal 监听、默认多线程
+# runtime、select! 宏），保证单独编译不依赖 workspace 特性合并。
+tokio = { workspace = true, features = ["signal", "rt-multi-thread", "macros"] }
 
 [lints]
 workspace = true

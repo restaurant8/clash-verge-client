@@ -33,6 +33,7 @@ env:
   CARGO_INCREMENTAL: 0
   HUSKY: 0
   NODE_OPTIONS: "--max_old_space_size=4096"
+  PUBLIC_RELEASE_REPOSITORY: restaurant8/muacloud-client-releases
   RUST_BACKTRACE: short
 
 concurrency:
@@ -80,7 +81,7 @@ jobs:
           fi
 
           PRERELEASE="${{ (github.event_name == 'workflow_dispatch' && inputs.prerelease) || contains(github.ref_name, '-rc') }}"
-          SIGN_UPDATES="${{ github.event_name == 'workflow_dispatch' && inputs.sign_updates }}"
+          SIGN_UPDATES="${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.sign_updates) }}"
           TELEGRAM_UPLOAD="${{ github.event_name == 'workflow_dispatch' && inputs.telegram_upload }}"
 
           if [ "$SIGN_UPDATES" = "true" ]; then
@@ -98,20 +99,21 @@ jobs:
 
       - name: Create Draft Release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PUBLIC_RELEASE_TOKEN }}
           PRERELEASE: ${{ steps.meta.outputs.prerelease }}
           RELEASE_TAG: ${{ steps.meta.outputs.release_tag }}
         shell: bash
         run: |
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+          if gh release view "$RELEASE_TAG" --repo "$PUBLIC_RELEASE_REPOSITORY" >/dev/null 2>&1; then
             gh release edit "$RELEASE_TAG" \
+              --repo "$PUBLIC_RELEASE_REPOSITORY" \
               --draft=true \
               --prerelease="$PRERELEASE" \
               --title "MuaCloud $RELEASE_TAG" \
               --notes "Draft desktop release. Verify assets before manual distribution."
           else
             gh release create "$RELEASE_TAG" \
-              --target "$GITHUB_SHA" \
+              --repo "$PUBLIC_RELEASE_REPOSITORY" \
               --draft \
               --prerelease="$PRERELEASE" \
               --title "MuaCloud $RELEASE_TAG" \
@@ -170,21 +172,38 @@ jobs:
       - name: Prepare Sidecars and Resources
         run: pnpm run prebuild ${{ matrix.target }}
 
-      - name: Build and Upload Tauri Bundle
-        uses: tauri-apps/tauri-action@v0.6.2
+      - name: Build Tauri Bundle
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-        with:
-          tagName: ${{ needs.prepare-release.outputs.release_tag }}
-          releaseName: "MuaCloud ${{ needs.prepare-release.outputs.release_tag }}"
-          releaseBody: "Draft desktop release. Verify assets before manual distribution."
-          releaseDraft: true
-          prerelease: ${{ needs.prepare-release.outputs.prerelease }}
-          tauriScript: pnpm
-          args: --target ${{ matrix.target }} ${{ needs.prepare-release.outputs.sign_args }}
-          includeUpdaterJson: false
+        run: pnpm tauri build --target ${{ matrix.target }} ${{ needs.prepare-release.outputs.sign_args }}
+
+      - name: Upload Bundle to Public Release
+        env:
+          GH_TOKEN: ${{ secrets.PUBLIC_RELEASE_TOKEN }}
+          RELEASE_TAG: ${{ needs.prepare-release.outputs.release_tag }}
+        shell: bash
+        run: |
+          shopt -s nullglob
+          assets=(
+            "target/${{ matrix.target }}/release/bundle/nsis/"*.exe
+            "target/${{ matrix.target }}/release/bundle/nsis/"*.exe.sig
+            "target/${{ matrix.target }}/release/bundle/msi/"*.msi
+            "target/${{ matrix.target }}/release/bundle/msi/"*.msi.sig
+            "target/${{ matrix.target }}/release/bundle/dmg/"*.dmg
+            "target/${{ matrix.target }}/release/bundle/dmg/"*.dmg.sig
+            "target/${{ matrix.target }}/release/bundle/macos/"*.app.tar.gz
+            "target/${{ matrix.target }}/release/bundle/macos/"*.app.tar.gz.sig
+          )
+
+          if [ "${#assets[@]}" -eq 0 ]; then
+            echo "No bundle assets found for ${{ matrix.target }}" >&2
+            exit 1
+          fi
+
+          gh release upload "$RELEASE_TAG" "${assets[@]}" \
+            --repo "$PUBLIC_RELEASE_REPOSITORY" \
+            --clobber
 
       - name: Upload Bundle to Telegram
         if: needs.prepare-release.outputs.telegram_upload == 'true'

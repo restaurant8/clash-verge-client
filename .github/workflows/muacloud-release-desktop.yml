@@ -97,7 +97,7 @@ jobs:
           echo "sign_args=$SIGN_ARGS" >> "$GITHUB_OUTPUT"
           echo "telegram_upload=$TELEGRAM_UPLOAD" >> "$GITHUB_OUTPUT"
 
-      - name: Create Draft Release
+      - name: Create Public Release
         env:
           GH_TOKEN: ${{ secrets.PUBLIC_RELEASE_TOKEN }}
           PRERELEASE: ${{ steps.meta.outputs.prerelease }}
@@ -107,17 +107,16 @@ jobs:
           if gh release view "$RELEASE_TAG" --repo "$PUBLIC_RELEASE_REPOSITORY" >/dev/null 2>&1; then
             gh release edit "$RELEASE_TAG" \
               --repo "$PUBLIC_RELEASE_REPOSITORY" \
-              --draft=true \
+              --draft=false \
               --prerelease="$PRERELEASE" \
               --title "MuaCloud $RELEASE_TAG" \
-              --notes "Draft desktop release. Verify assets before manual distribution."
+              --notes "MuaCloud desktop release."
           else
             gh release create "$RELEASE_TAG" \
               --repo "$PUBLIC_RELEASE_REPOSITORY" \
-              --draft \
               --prerelease="$PRERELEASE" \
               --title "MuaCloud $RELEASE_TAG" \
-              --notes "Draft desktop release. Verify assets before manual distribution."
+              --notes "MuaCloud desktop release."
           fi
 
   build-desktop:

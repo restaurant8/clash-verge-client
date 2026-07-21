@@ -33,6 +33,67 @@ const fn proxy_apply_steps(sys_enabled: bool, auto_enabled: bool) -> [ProxyApply
     }
 }
 
+fn proxy_value_is_owned(enabled: bool, current: &str, expected: &str) -> bool {
+    enabled && current == expected
+}
+
+fn sysproxy_is_owned(current: &Sysproxy, expected: &Sysproxy) -> bool {
+    current.enable && current.host == expected.host && current.port == expected.port
+}
+
+fn disable_owned_proxies(mut sys: Sysproxy, mut auto: Autoproxy) -> Result<()> {
+    // 读取当前系统代理状态时可能失败：当其他 TUN 代理软件（如小火箭）把 utun 顶为主接口，
+    // sysproxy 无法把 PrimaryService 解析成网卡服务（"failed to get default network interface"）。
+    // 这种情况下我们既无法判断代理归属、也无从下手清理，等同于“没有可关的自有代理”，
+    // 直接跳过即可——绝不能把这个探测错误当致命错误上抛，否则会连累整个配置 patch 失败，
+    // 进而错误地拦住登出/退出（前端 forceDisableProxy 会因此判定“关代理失败”而取消退出）。
+    let current_sys = match Sysproxy::get_system_proxy() {
+        Ok(sys) => sys,
+        Err(err) => {
+            logging!(
+                warn,
+                Type::System,
+                "读取系统代理状态失败，跳过清理（可能由其他代理软件接管主网卡）: {err}"
+            );
+            return Ok(());
+        }
+    };
+    let current_auto = match Autoproxy::get_auto_proxy() {
+        Ok(auto) => auto,
+        Err(err) => {
+            logging!(
+                warn,
+                Type::System,
+                "读取自动代理(PAC)状态失败，跳过清理（可能由其他代理软件接管主网卡）: {err}"
+            );
+            return Ok(());
+        }
+    };
+    let owns_sys = sysproxy_is_owned(&current_sys, &sys);
+    let owns_auto = proxy_value_is_owned(current_auto.enable, current_auto.url.as_str(), auto.url.as_str());
+    let foreign_proxy_active = (current_sys.enable && !owns_sys) || (current_auto.enable && !owns_auto);
+
+    if foreign_proxy_active {
+        logging!(
+            info,
+            Type::System,
+            "检测到系统代理由其他应用管理，跳过清理以避免影响外部代理"
+        );
+        return Ok(());
+    }
+
+    if owns_sys {
+        sys.enable = false;
+        sys.set_system_proxy()?;
+    }
+    if owns_auto {
+        auto.enable = false;
+        auto.set_auto_proxy()?;
+    }
+
+    Ok(())
+}
+
 pub struct Sysopt {
     update_lock: TokioMutex<()>,
     reset_sysproxy: AtomicBool,
@@ -180,9 +241,13 @@ impl Sysopt {
 
         self.access_guard().write().set_guard_type(guard_type);
 
+        let disabling = !sys_enable;
         let apply_steps = proxy_apply_steps(sys.enable, auto.enable);
 
         tokio::task::spawn_blocking(move || -> Result<()> {
+            if disabling {
+                return disable_owned_proxies(sys, auto);
+            }
             for step in apply_steps {
                 match step {
                     ProxyApplyStep::Autoproxy => auto.set_auto_proxy()?,
@@ -212,7 +277,7 @@ impl Sysopt {
         // close proxy guard
         self.access_guard().write().set_guard_type(GuardType::None);
 
-        // 直接关闭所有代理
+        // 仅关闭本应用拥有的代理，避免清除其他代理软件接管后的系统配置。
         let (sys, auto) = {
             let (sys, auto) = &mut *self.inner_proxy.write();
             sys.enable = false;
@@ -220,12 +285,7 @@ impl Sysopt {
             (sys.clone(), auto.clone())
         };
 
-        tokio::task::spawn_blocking(move || -> Result<()> {
-            sys.set_system_proxy()?;
-            auto.set_auto_proxy()?;
-            Ok(())
-        })
-        .await??;
+        tokio::task::spawn_blocking(move || -> Result<()> { disable_owned_proxies(sys, auto) }).await??;
 
         Ok(())
     }
@@ -233,7 +293,14 @@ impl Sysopt {
 
 #[cfg(test)]
 mod tests {
-    use super::{ProxyApplyStep, proxy_apply_steps};
+    use super::{ProxyApplyStep, proxy_apply_steps, proxy_value_is_owned};
+
+    #[test]
+    fn proxy_is_owned_only_when_enabled_and_matching() {
+        assert!(proxy_value_is_owned(true, "127.0.0.1:17997", "127.0.0.1:17997"));
+        assert!(!proxy_value_is_owned(false, "127.0.0.1:17997", "127.0.0.1:17997"));
+        assert!(!proxy_value_is_owned(true, "127.0.0.1:1082", "127.0.0.1:17997"));
+    }
 
     #[test]
     fn pure_sysproxy_mode_clears_pac_before_enabling_global_proxy() {

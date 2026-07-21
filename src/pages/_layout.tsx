@@ -60,6 +60,16 @@ type MenuContextPosition = { top: number; left: number }
 
 // 仅“高级”保留隐藏（5 次点击账户解锁）；“设置”直接显示在导航中。
 const SETTINGS_ENTRY_PATHS = new Set(['/advanced'])
+// 离线模式（未登录 + 本地订阅）下允许访问的页面
+const OFFLINE_NAV_PATHS = new Set([
+  '/',
+  '/profiles',
+  '/proxies',
+  '/connections',
+  '/settings',
+])
+// 仅离线模式可见的页面：登录后订阅由云端接管，隐藏本地订阅管理入口
+const OFFLINE_ONLY_PATHS = new Set(['/profiles', '/proxies'])
 const SETTINGS_UNLOCK_STORAGE_KEY = 'muacloud:settings-menu-unlocked'
 const SETTINGS_UNLOCK_CLICK_COUNT = 5
 const SETTINGS_UNLOCK_CLICK_WINDOW_MS = 2000
@@ -124,7 +134,7 @@ const APP_WINDOW_MIN_SIZE = new LogicalSize(860, 620)
 const Layout = () => {
   const mode = useThemeMode()
   const { t } = useTranslation()
-  const { remote, session, booting, appConfig } = useXboard()
+  const { remote, session, booting, appConfig, offlineMode } = useXboard()
   const { theme } = useCustomTheme()
   const { verge, mutateVerge, patchVerge } = useVerge()
   const { language } = verge ?? {}
@@ -132,7 +142,8 @@ const Layout = () => {
   const { switchLanguage } = useI18n()
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const shouldShowAppShell = Boolean(session)
+  const offlineActive = !session && offlineMode
+  const shouldShowAppShell = Boolean(session) || offlineActive
   const themeReady = useMemo(() => Boolean(theme), [theme])
   const resolveNavLabel = useCallback(
     (label: string) => (label.includes('.') ? t(label) : label),
@@ -185,6 +196,12 @@ const Layout = () => {
       ![false, 0, '0', 'false'].includes(features[key])
 
     return navItems.filter((item) => {
+      if (offlineActive) {
+        return OFFLINE_NAV_PATHS.has(item.path)
+      }
+      if (OFFLINE_ONLY_PATHS.has(item.path)) {
+        return false
+      }
       if (SETTINGS_ENTRY_PATHS.has(item.path)) {
         return settingsMenuUnlocked
       }
@@ -196,7 +213,12 @@ const Layout = () => {
       }
       return true
     })
-  }, [appConfig?.features, remote.bootstrap?.features, settingsMenuUnlocked])
+  }, [
+    appConfig?.features,
+    offlineActive,
+    remote.bootstrap?.features,
+    settingsMenuUnlocked,
+  ])
 
   const {
     menuOrder,
@@ -307,7 +329,7 @@ const Layout = () => {
   useEffect(() => {
     if (booting || !isTauriRuntime()) return
 
-    const nextMode = session ? 'app' : 'auth'
+    const nextMode = session || offlineActive ? 'app' : 'auth'
     if (lastWindowModeRef.current === nextMode) return
     lastWindowModeRef.current = nextMode
 
@@ -342,13 +364,24 @@ const Layout = () => {
     }
 
     void applyWindowMode()
-  }, [booting, currentWindow, refreshDecorated, session])
+  }, [booting, currentWindow, offlineActive, refreshDecorated, session])
 
   useEffect(() => {
-    if (!booting && !session && pathname !== '/') {
+    if (booting) return
+    if (!session && !offlineActive && pathname !== '/') {
+      navigate('/', { replace: true })
+      return
+    }
+    // 离线模式仅开放本地订阅相关页面
+    if (offlineActive && !OFFLINE_NAV_PATHS.has(pathname)) {
+      navigate('/', { replace: true })
+      return
+    }
+    // 登录后订阅由云端接管，本地订阅管理页不可进入
+    if (session && OFFLINE_ONLY_PATHS.has(pathname)) {
       navigate('/', { replace: true })
     }
-  }, [booting, navigate, pathname, session])
+  }, [booting, navigate, offlineActive, pathname, session])
 
   useEffect(() => {
     if (
@@ -356,9 +389,15 @@ const Layout = () => {
       !settingsMenuUnlocked &&
       SETTINGS_ENTRY_PATHS.has(pathname)
     ) {
-      navigate('/account', { replace: true })
+      navigate(offlineActive ? '/' : '/account', { replace: true })
     }
-  }, [navigate, pathname, settingsMenuUnlocked, shouldShowAppShell])
+  }, [
+    navigate,
+    offlineActive,
+    pathname,
+    settingsMenuUnlocked,
+    shouldShowAppShell,
+  ])
 
   useEffect(() => {
     if (language) {

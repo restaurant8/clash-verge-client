@@ -13,71 +13,77 @@ where
     Fut: Future + Send + 'static,
 {
     if let Some(Some(rt)) = RUNTIME.get() {
-        rt.spawn(async move {
-            let mut ctrl_c = match windows::ctrl_c() {
-                Ok(s) => s,
-                Err(e) => {
-                    logging!(error, Type::SystemSignal, "Failed to register Ctrl+C: {}", e);
-                    return;
-                }
-            };
-
-            let mut ctrl_close = match windows::ctrl_close() {
-                Ok(s) => s,
-                Err(e) => {
-                    logging!(error, Type::SystemSignal, "Failed to register Ctrl+Close: {}", e);
-                    return;
-                }
-            };
-
-            let mut ctrl_shutdown = match windows::ctrl_shutdown() {
-                Ok(s) => s,
-                Err(e) => {
-                    logging!(error, Type::SystemSignal, "Failed to register Ctrl+Shutdown: {}", e);
-                    return;
-                }
-            };
-
-            let mut ctrl_logoff = match windows::ctrl_logoff() {
-                Ok(s) => s,
-                Err(e) => {
-                    logging!(error, Type::SystemSignal, "Failed to register Ctrl+Logoff: {}", e);
-                    return;
-                }
-            };
-
-            loop {
-                let signal_name;
-                tokio::select! {
-                    _ = ctrl_c.recv() => {
-                        signal_name = "Ctrl+C";
+        // current_thread runtime 只有被 block_on 驱动时才会轮询任务：
+        // 若只 rt.spawn 而无人驱动，信号监听协程永远不会执行，控制台/
+        // 关机/注销事件的处理器也不会注册，系统会直接终止进程，跳过
+        // 全部退出清理（系统代理重置等）。这里用独立线程驱动监听循环。
+        std::thread::spawn(move || {
+            rt.block_on(async move {
+                let mut ctrl_c = match windows::ctrl_c() {
+                    Ok(s) => s,
+                    Err(e) => {
+                        logging!(error, Type::SystemSignal, "Failed to register Ctrl+C: {}", e);
+                        return;
                     }
-                    _ = ctrl_close.recv() => {
-                        signal_name = "Ctrl+Close";
+                };
+
+                let mut ctrl_close = match windows::ctrl_close() {
+                    Ok(s) => s,
+                    Err(e) => {
+                        logging!(error, Type::SystemSignal, "Failed to register Ctrl+Close: {}", e);
+                        return;
                     }
-                    _ = ctrl_shutdown.recv() => {
-                        signal_name = "Ctrl+Shutdown";
+                };
+
+                let mut ctrl_shutdown = match windows::ctrl_shutdown() {
+                    Ok(s) => s,
+                    Err(e) => {
+                        logging!(error, Type::SystemSignal, "Failed to register Ctrl+Shutdown: {}", e);
+                        return;
                     }
-                    _ = ctrl_logoff.recv() => {
-                        signal_name = "Ctrl+Logoff";
+                };
+
+                let mut ctrl_logoff = match windows::ctrl_logoff() {
+                    Ok(s) => s,
+                    Err(e) => {
+                        logging!(error, Type::SystemSignal, "Failed to register Ctrl+Logoff: {}", e);
+                        return;
                     }
+                };
+
+                loop {
+                    let signal_name;
+                    tokio::select! {
+                        _ = ctrl_c.recv() => {
+                            signal_name = "Ctrl+C";
+                        }
+                        _ = ctrl_close.recv() => {
+                            signal_name = "Ctrl+Close";
+                        }
+                        _ = ctrl_shutdown.recv() => {
+                            signal_name = "Ctrl+Shutdown";
+                        }
+                        _ = ctrl_logoff.recv() => {
+                            signal_name = "Ctrl+Logoff";
+                        }
+                    }
+
+                    if IS_CLEANING_UP.load(Ordering::SeqCst) {
+                        logging!(
+                            info,
+                            Type::SystemSignal,
+                            "Already shutting down, ignoring repeated signal: {}",
+                            signal_name
+                        );
+                        continue;
+                    }
+                    IS_CLEANING_UP.store(true, Ordering::SeqCst);
+
+                    logging!(info, Type::SystemSignal, "Caught Windows signal: {}", signal_name);
+
+                    f().await;
                 }
-
-                if IS_CLEANING_UP.load(Ordering::SeqCst) {
-                    logging!(
-                        info,
-                        Type::SystemSignal,
-                        "Already shutting down, ignoring repeated signal: {}",
-                        signal_name
-                    );
-                    continue;
-                }
-                IS_CLEANING_UP.store(true, Ordering::SeqCst);
-
-                logging!(info, Type::SystemSignal, "Caught Windows signal: {}", signal_name);
-
-                f().await;
-            }
+            });
         });
     } else {
         logging!(

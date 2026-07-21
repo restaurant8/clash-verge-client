@@ -16,6 +16,29 @@ pub async fn open_or_close_dashboard() {
     logging!(info, Type::Window, "Window toggle result: {result:?}");
 }
 
+/// 读取当前系统代理 / TUN 开关状态。
+pub async fn current_proxy_flags() -> (bool, bool) {
+    let data = Config::verge().await.data_arc();
+    (
+        data.enable_system_proxy.unwrap_or(false),
+        data.enable_tun_mode.unwrap_or(false),
+    )
+}
+
+/// 兜底：把系统代理与 TUN 开关持久化为关闭。
+///
+/// 退出时仅临时重置 OS 代理是不够的：配置里 enable_system_proxy 仍为 true，
+/// 下次启动 init_system_proxy 会把系统代理重新指向本地端口；如果那时内核
+/// 没有可用配置（例如已退出登录、订阅拉取失败），设备会直接断网，连登录
+/// 接口都走这个失效代理，形成“无法上网、也无法登录”的死锁。
+async fn persist_proxy_disabled() {
+    Config::verge().await.edit_draft(|d| {
+        d.enable_system_proxy = Some(false);
+        d.enable_tun_mode = Some(false);
+    });
+    logging!(info, Type::System, "已将系统代理/TUN 开关持久化为关闭");
+}
+
 pub async fn quit() {
     logging!(debug, Type::System, "启动退出流程");
     // 设置退出标志
@@ -33,10 +56,18 @@ pub async fn quit() {
     });
 
     utils::server::shutdown_embedded_server();
+
+    // 先记录退出前的真实开关状态供 OS 级清理使用，再把开关持久化为关闭，
+    // 保证配置落盘发生在清理之前——即使后续清理超时被看门狗强杀，
+    // 下次启动也不会带着失效的系统代理起来。
+    let (sys_proxy_enabled, tun_enabled) = current_proxy_flags().await;
+    if sys_proxy_enabled || tun_enabled {
+        persist_proxy_disabled().await;
+    }
     Config::apply_all_and_save_file().await;
 
     logging!(info, Type::System, "开始异步清理资源");
-    let cleanup_result = clean_async().await;
+    let cleanup_result = clean_async(sys_proxy_enabled, tun_enabled).await;
 
     logging!(
         info,
@@ -69,12 +100,13 @@ fn kill_stray_cores() {
     }
 }
 
-pub async fn clean_async() -> bool {
+/// 异步清理资源。`sys_proxy_enabled` / `tun_enabled` 由调用方在清理前捕获，
+/// 因为 quit() 会在清理前把配置里的开关持久化为 false，此处不能再读配置。
+pub async fn clean_async(sys_proxy_enabled: bool, tun_enabled: bool) -> bool {
     logging!(info, Type::System, "开始执行异步清理操作...");
 
     // 重置系统代理
-    let proxy_task = tokio::task::spawn(async {
-        let sys_proxy_enabled = Config::verge().await.data_arc().enable_system_proxy.unwrap_or(false);
+    let proxy_task = tokio::task::spawn(async move {
         if !sys_proxy_enabled {
             logging!(info, Type::Window, "系统代理未启用，跳过重置");
             return true;
@@ -98,9 +130,8 @@ pub async fn clean_async() -> bool {
     });
 
     // 关闭 Tun 模式 + 停止核心服务
-    let core_task = tokio::task::spawn(async {
+    let core_task = tokio::task::spawn(async move {
         logging!(info, Type::System, "disable tun");
-        let tun_enabled = Config::verge().await.data_arc().enable_tun_mode.unwrap_or(false);
         if tun_enabled {
             let disable_tun = serde_json::json!({ "tun": { "enable": false } });
 

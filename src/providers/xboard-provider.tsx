@@ -15,7 +15,7 @@ import {
   useState,
 } from 'react'
 
-import { stopCore } from '@/services/cmds'
+import { patchVergeConfig, stopCore } from '@/services/cmds'
 import { setDelayDisplayScale } from '@/services/delay'
 import { showNotice } from '@/services/notice-service'
 import {
@@ -29,8 +29,10 @@ import {
 } from '@/services/xboard/remote-config'
 import {
   clearXboardSession,
+  readOfflineMode,
   readSubscriptionSyncAt,
   readXboardSession,
+  saveOfflineMode,
   saveXboardSession,
   writeSubscriptionSyncAt,
 } from '@/services/xboard/session'
@@ -99,6 +101,37 @@ const SUBSCRIPTION_SYNC_COOLDOWN_MS = 2 * 60 * 60 * 1000
 type SubscriptionInitializationState = {
   status: 'idle' | 'loading' | 'error'
   message?: string
+}
+
+/** 关闭代理的 IPC 超时上限：超时按失败处理，避免卡死登出/断开流程。 */
+const FORCE_DISABLE_PROXY_TIMEOUT_MS = 3000
+
+/**
+ * 兜底：强制关闭系统代理与 TUN 并持久化。
+ * 退出登录 / 断开连接前必须先执行完成，否则系统代理仍指向本地端口，
+ * 内核一旦停止或配置失效，设备会断网，连登录接口都无法访问。
+ *
+ * @returns 是否确认关闭成功；失败/超时返回 false，由调用方决定提示或中止。
+ */
+const forceDisableProxy = async (): Promise<boolean> => {
+  try {
+    await Promise.race([
+      patchVergeConfig({
+        enable_system_proxy: false,
+        enable_tun_mode: false,
+      }),
+      new Promise<never>((_, reject) => {
+        setTimeout(
+          () => reject(new Error('关闭系统代理超时')),
+          FORCE_DISABLE_PROXY_TIMEOUT_MS,
+        )
+      }),
+    ])
+    return true
+  } catch (error) {
+    console.warn('[Xboard] failed to force-disable system proxy', error)
+    return false
+  }
 }
 
 const buildClient = (remote: XboardResolvedConfig) =>
@@ -236,6 +269,7 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<XboardSession | null>(() =>
     readXboardSession(),
   )
+  const [offlineMode, setOfflineMode] = useState(() => readOfflineMode())
   const [userInfo, setUserInfo] = useState<XboardRecord | undefined>()
   const [subscribeInfo, setSubscribeInfo] = useState<XboardRecord | undefined>()
   const [servers, setServers] = useState<XboardRecord[]>([])
@@ -254,6 +288,7 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
   })
   const lastAuthExpiredNoticeAtRef = useRef(0)
   const authOperationRef = useRef(0)
+  const logoutInProgressRef = useRef(false)
   const cachedSubscriptionTokensRef = useRef(new Set<string>())
   const [subscriptionInitialization, setSubscriptionInitialization] =
     useState<SubscriptionInitializationState>({ status: 'idle' })
@@ -313,21 +348,61 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
     [client, remote.remoteConfig],
   )
 
-  const logout = useCallback(() => {
-    authOperationRef.current += 1
-    clearXboardSession()
-    setSession(null)
-    setUserInfo(undefined)
-    setSubscribeInfo(undefined)
-    setServers([])
-    setAppConfig(undefined)
-    setNotices([])
-    setAccountHydrated(false)
-    setConnection({ status: 'disconnected' })
-    setRefreshing(false)
-    setSubscriptionInitialization({ status: 'idle' })
-    clearResourceCache()
-  }, [clearResourceCache])
+  const logout = useCallback(
+    async (options: { force?: boolean } = {}) => {
+      // 防重入：await 关代理期间重复触发（连点按钮 / 登录态失效事件叠加）只执行一次
+      if (logoutInProgressRef.current) return
+      logoutInProgressRef.current = true
+
+      // 立即作废所有进行中的账号/订阅操作，避免 await 期间旧请求回写状态
+      authOperationRef.current += 1
+
+      try {
+        // 兜底：必须先确认系统代理/TUN 已关闭再清除登录态，
+        // 否则登录页的请求会走失效代理导致断网、无法重新登录
+        const proxyDisabled = await forceDisableProxy()
+        if (!proxyDisabled) {
+          if (!options.force) {
+            // 手动退出：严格保证“先关代理再登出”，关闭失败则取消本次登出
+            showNotice.error(
+              '关闭系统代理失败，已取消退出登录；请重试或先手动关闭系统代理',
+            )
+            return
+          }
+          // 强制登出（登录态已在服务端失效）无法取消，只能强提示用户手动处理
+          showNotice.error(
+            '关闭系统代理失败，请在系统设置中手动关闭代理，否则可能无法上网',
+          )
+        }
+      } finally {
+        logoutInProgressRef.current = false
+      }
+
+      clearXboardSession()
+      setSession(null)
+      setUserInfo(undefined)
+      setSubscribeInfo(undefined)
+      setServers([])
+      setAppConfig(undefined)
+      setNotices([])
+      setAccountHydrated(false)
+      setConnection({ status: 'disconnected' })
+      setRefreshing(false)
+      setSubscriptionInitialization({ status: 'idle' })
+      clearResourceCache()
+    },
+    [clearResourceCache],
+  )
+
+  const enterOfflineMode = useCallback(() => {
+    setOfflineMode(true)
+    saveOfflineMode(true)
+  }, [])
+
+  const exitOfflineMode = useCallback(() => {
+    setOfflineMode(false)
+    saveOfflineMode(false)
+  }, [])
 
   const notifyAuthExpired = useCallback((message: string) => {
     const now = Date.now()
@@ -342,7 +417,7 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
       const message = error.message || '登录状态已失效，请重新登录'
       setLastError(message)
       setConnection({ status: 'disconnected' })
-      logout()
+      void logout({ force: true })
       notifyAuthExpired(message)
       return true
     },
@@ -362,7 +437,7 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
 
       setLastError(message)
       setConnection({ status: 'disconnected' })
-      logout()
+      void logout({ force: true })
       notifyAuthExpired(message)
     }
 
@@ -512,6 +587,9 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
       setAccountHydrated(false)
       setSession(nextSession)
       saveXboardSession(nextSession)
+      // 登录成功后回到正常的账号订阅模式
+      setOfflineMode(false)
+      saveOfflineMode(false)
       setRefreshing(false)
       setSubscriptionInitialization(
         hasCachedSubscription ? { status: 'idle' } : { status: 'loading' },
@@ -728,6 +806,14 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
   }, [applySnapshot, client, handleAuthExpired, remote.remoteConfig, session])
 
   const disconnect = useCallback(async () => {
+    // 必须先确认系统代理/TUN 已关闭再停内核：若代理还开着就停核，
+    // 系统代理会指向已停止的端口，设备立即断网
+    const proxyDisabled = await forceDisableProxy()
+    if (!proxyDisabled) {
+      const message = '关闭系统代理失败，已取消断开连接，以免设备断网'
+      showNotice.error(message)
+      throw new Error(message)
+    }
     await stopCore()
     setConnection({ status: 'disconnected' })
     showNotice.info('已断开连接')
@@ -882,6 +968,9 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
       accountHydrated,
       connection,
       lastError,
+      offlineMode,
+      enterOfflineMode,
+      exitOfflineMode,
       refreshRemoteConfig,
       refreshAccount,
       loadPlans,
@@ -904,6 +993,8 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
       connect,
       connection,
       disconnect,
+      enterOfflineMode,
+      exitOfflineMode,
       lastError,
       loadActiveSessions,
       loadOrders,
@@ -914,6 +1005,7 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
       login,
       logout,
       notices,
+      offlineMode,
       refreshAccount,
       refreshRemoteConfig,
       refreshing,
@@ -973,7 +1065,7 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
                   >
                     重新初始化
                   </Button>
-                  <Button variant="outlined" onClick={logout}>
+                  <Button variant="outlined" onClick={() => void logout()}>
                     退出登录
                   </Button>
                 </Stack>

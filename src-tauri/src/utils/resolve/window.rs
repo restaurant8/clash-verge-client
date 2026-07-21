@@ -49,7 +49,7 @@ fn strip_windows_login_frame(window: &WebviewWindow) {
 }
 
 #[cfg(not(windows))]
-fn strip_windows_login_frame(_window: &WebviewWindow) {}
+const fn strip_windows_login_frame(_window: &WebviewWindow) {}
 
 const fn restored_window_size_is_too_small(width: u32, height: u32) -> bool {
     width < MINIMAL_WIDTH as u32 || height < MINIMAL_HEIGHT as u32

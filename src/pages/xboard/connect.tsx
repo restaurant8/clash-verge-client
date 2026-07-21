@@ -1,9 +1,11 @@
 import {
   CloseRounded,
+  CloudSyncRounded,
   DnsOutlined,
   EmailRounded,
   LoginRounded,
   RouterOutlined,
+  WifiOffRounded,
 } from '@mui/icons-material'
 import {
   Alert,
@@ -659,8 +661,15 @@ const CaptchaControl = ({
 }
 
 const AuthPanel = () => {
-  const { client, login, register, remote, refreshing, refreshRemoteConfig } =
-    useXboard()
+  const {
+    client,
+    login,
+    register,
+    remote,
+    refreshing,
+    refreshRemoteConfig,
+    enterOfflineMode,
+  } = useXboard()
   const authContentRef = useRef<HTMLDivElement | null>(null)
   const [mode, setMode] = useState<LoginMode>('login')
   const [email, setEmail] = useState('')
@@ -1259,9 +1268,78 @@ const AuthPanel = () => {
               {submitLabel}
             </XboardActionButton>
           </Box>
+          <Button
+            variant="text"
+            size="small"
+            startIcon={<WifiOffRounded fontSize="small" />}
+            onClick={enterOfflineMode}
+            sx={{ alignSelf: 'center', color: 'text.secondary' }}
+          >
+            无法登录？进入离线模式（使用本地订阅）
+          </Button>
         </Stack>
       </Box>
     </Box>
+  )
+}
+
+const OfflineConnectPanel = () => {
+  const navigate = useNavigate()
+  const { exitOfflineMode } = useXboard()
+
+  return (
+    <XboardPage
+      title="离线模式"
+      subtitle="不登录账号，直接使用本地订阅联网"
+      action={
+        <Button
+          variant="outlined"
+          startIcon={<LoginRounded />}
+          onClick={exitOfflineMode}
+        >
+          返回登录
+        </Button>
+      }
+    >
+      <Stack spacing={2}>
+        <Alert severity="info">
+          离线模式不校验账号权益，直接使用本地已导入的订阅配置。请先在「订阅」页导入并启用订阅，再在「代理」页选择节点；登录成功后会自动恢复账号订阅模式。
+        </Alert>
+
+        <Grid container spacing={1.5}>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <EnhancedCard
+              title="网络设置"
+              icon={<DnsOutlined />}
+              iconColor="primary"
+            >
+              <ProxyTunCard />
+            </EnhancedCard>
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <EnhancedCard
+              title="代理模式"
+              icon={<RouterOutlined />}
+              iconColor="info"
+            >
+              <ClashModeCard showCurrentNodeSelector />
+            </EnhancedCard>
+          </Grid>
+        </Grid>
+
+        <Stack direction="row" spacing={1.5}>
+          <XboardActionButton
+            startIcon={<CloudSyncRounded />}
+            onClick={() => navigate('/profiles')}
+          >
+            管理订阅
+          </XboardActionButton>
+          <Button variant="outlined" onClick={() => navigate('/proxies')}>
+            选择节点
+          </Button>
+        </Stack>
+      </Stack>
+    </XboardPage>
   )
 }
 
@@ -1275,6 +1353,7 @@ const ConnectPage = () => {
     booting,
     connection,
     accountHydrated,
+    offlineMode,
   } = useXboard()
 
   const used = Number(subscribeInfo?.u ?? 0) + Number(subscribeInfo?.d ?? 0)
@@ -1306,7 +1385,7 @@ const ConnectPage = () => {
     )
   }
 
-  if (!session) return <AuthPanel />
+  if (!session) return offlineMode ? <OfflineConnectPanel /> : <AuthPanel />
 
   return (
     <XboardPage title="系统-网卡双代理" subtitle="真全局">

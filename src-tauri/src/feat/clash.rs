@@ -1,7 +1,7 @@
 use crate::{
     config::Config,
     core::{CoreManager, handle, tray},
-    feat::clean_async,
+    feat::{clean_async, current_proxy_flags},
     process::AsyncHandler,
     utils,
 };
@@ -47,7 +47,9 @@ pub async fn restart_app() {
     Config::apply_all_and_save_file().await;
 
     logging!(info, Type::System, "开始异步清理资源");
-    let cleanup_result = clean_async().await;
+    // 重启后应用会立刻回来并按配置恢复代理，这里不持久化关闭开关
+    let (sys_proxy_enabled, tun_enabled) = current_proxy_flags().await;
+    let cleanup_result = clean_async(sys_proxy_enabled, tun_enabled).await;
 
     logging!(
         info,

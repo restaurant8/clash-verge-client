@@ -258,7 +258,7 @@ const AccountPage = () => {
             color="error"
             variant="outlined"
             startIcon={<LogoutRounded />}
-            onClick={logout}
+            onClick={() => void logout()}
           >
             退出
           </Button>

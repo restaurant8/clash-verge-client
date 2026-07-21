@@ -29,6 +29,13 @@ export interface XboardContextValue {
   accountHydrated: boolean
   connection: XboardConnectionState
   lastError?: string
+  /**
+   * 离线模式：不登录账号，直接使用本地已导入的订阅（原版订阅模式）。
+   * 用于登录服务不可用时的兜底通道；登录成功后自动退出该模式。
+   */
+  offlineMode: boolean
+  enterOfflineMode: () => void
+  exitOfflineMode: () => void
   refreshRemoteConfig: (force?: boolean) => Promise<XboardResolvedConfig>
   refreshAccount: () => Promise<void>
   loadPlans: (force?: boolean) => Promise<void>
@@ -39,7 +46,12 @@ export interface XboardContextValue {
   loadTrafficLogs: (force?: boolean) => Promise<void>
   login: (email: string, password: string) => Promise<void>
   register: (payload: Record<string, unknown>) => Promise<void>
-  logout: () => void
+  /**
+   * 登出前必须先确认系统代理/TUN 已关闭，再清除会话。
+   * 默认（手动登出）关闭失败会取消登出并提示；`force: true` 用于登录态
+   * 已在服务端失效的强制登出，无法取消，失败时仅强提示用户手动关闭。
+   */
+  logout: (options?: { force?: boolean }) => Promise<void>
   connect: () => Promise<void>
   disconnect: () => Promise<void>
 }

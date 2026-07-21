@@ -63,3 +63,28 @@ export const clearXboardSession = () => {
   window.localStorage.removeItem(SESSION_KEY)
   clearSubscriptionSyncAt()
 }
+
+const OFFLINE_MODE_KEY = 'xboard.offlineMode.v1'
+
+/** 离线模式：不登录账号，直接使用本地订阅（原版订阅模式）。 */
+export const readOfflineMode = (): boolean => {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.localStorage.getItem(OFFLINE_MODE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+export const saveOfflineMode = (enabled: boolean) => {
+  if (typeof window === 'undefined') return
+  try {
+    if (enabled) {
+      window.localStorage.setItem(OFFLINE_MODE_KEY, '1')
+    } else {
+      window.localStorage.removeItem(OFFLINE_MODE_KEY)
+    }
+  } catch {
+    // ignore storage failures (e.g. private mode quota)
+  }
+}

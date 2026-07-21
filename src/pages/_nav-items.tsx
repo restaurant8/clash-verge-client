@@ -1,14 +1,18 @@
 import AccountCircleRoundedIcon from '@mui/icons-material/AccountCircleRounded'
+import CloudSyncRoundedIcon from '@mui/icons-material/CloudSyncRounded'
 import EqualizerRoundedIcon from '@mui/icons-material/EqualizerRounded'
 import HomeRoundedIcon from '@mui/icons-material/HomeRounded'
 import HubRoundedIcon from '@mui/icons-material/HubRounded'
 import LanguageRoundedIcon from '@mui/icons-material/LanguageRounded'
+import LanRoundedIcon from '@mui/icons-material/LanRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded'
 import ShoppingCartRoundedIcon from '@mui/icons-material/ShoppingCartRounded'
 import SupportAgentRoundedIcon from '@mui/icons-material/SupportAgentRounded'
 
 import ConnectionsPage from './connections'
+import ProfilesPage from './profiles'
+import ProxiesPage from './proxies'
 import SettingsPage from './settings-entry'
 import AccountPage from './xboard/account'
 import AdvancedSettingsPage from './xboard/advanced-entry'
@@ -25,6 +29,19 @@ export const navItems = [
     path: '/',
     icon: [<HomeRoundedIcon key="mui" />],
     Component: ConnectPage,
+  },
+  // 离线模式（本地订阅）专用页面：仅在未登录且开启离线模式时显示，见 _layout.tsx
+  {
+    label: '订阅',
+    path: '/profiles',
+    icon: [<CloudSyncRoundedIcon key="mui" />],
+    Component: ProfilesPage,
+  },
+  {
+    label: '代理',
+    path: '/proxies',
+    icon: [<LanRoundedIcon key="mui" />],
+    Component: ProxiesPage,
   },
   {
     label: '节点',

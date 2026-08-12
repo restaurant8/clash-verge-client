@@ -202,21 +202,22 @@ pub async fn apply_dns_config(apply: bool) -> CmdResult {
         })?;
 
         // 解析DNS配置
-        let patch_config = serde_yaml_ng::from_str::<serde_yaml_ng::Mapping>(&dns_yaml).stringify_err_log(|e| {
+        serde_yaml_ng::from_str::<serde_yaml_ng::Mapping>(&dns_yaml).stringify_err_log(|e| {
             logging!(error, Type::Config, "Failed to parse DNS config: {e}");
         })?;
 
-        logging!(info, Type::Config, "Applying DNS config from file");
+        logging!(
+            info,
+            Type::Config,
+            "Applying DNS config through full config regeneration"
+        );
 
         // 创建包含DNS配置的patch
-        let mut patch = serde_yaml_ng::Mapping::new();
-        patch.insert("dns".into(), patch_config.into());
+        // Regenerate through enhance() instead of patching the runtime draft.
+        // A direct patch here runs after enhance() and overwrites the final
+        // remote nameserver-policy merge when DNS override is enabled.
 
         // 应用DNS配置到运行时配置
-        Config::runtime().await.edit_draft(|d| {
-            d.patch_config(&patch);
-        });
-
         // 应用新配置
         CoreManager::global()
             .update_config_checked()

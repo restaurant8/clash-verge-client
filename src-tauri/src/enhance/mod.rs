@@ -683,7 +683,11 @@ async fn apply_remote_dns_policy(mut config: Mapping) -> Mapping {
     };
     dns.insert(key, Value::Mapping(merged));
     config.insert(dns_key, Value::Mapping(dns));
-    logging!(info, Type::Config, "apply remote dns nameserver-policy ({entries} entries)");
+    logging!(
+        info,
+        Type::Config,
+        "apply remote dns nameserver-policy ({entries} entries)"
+    );
     config
 }
 

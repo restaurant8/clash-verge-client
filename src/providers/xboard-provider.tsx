@@ -14,6 +14,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 
 import { patchVergeConfig, stopCore } from '@/services/cmds'
 import { setDelayDisplayScale } from '@/services/delay'
@@ -304,6 +305,19 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     void pushNameserverPolicy(remote.remoteConfig.dns_nameserver_policy)
   }, [remote.remoteConfig.dns_nameserver_policy])
+
+  // Empty means the server does not control this preference.  When present,
+  // apply it through the same full regeneration path as the settings switch.
+  useEffect(() => {
+    const value = remote.remoteConfig.dns_overwrite_enabled
+    if (value === '') return
+    const enabled = value === true
+    void patchVergeConfig({ enable_dns_settings: enabled })
+      .then(() => invoke('apply_dns_config', { apply: enabled }))
+      .catch((error) =>
+        console.warn('[Xboard] failed to apply remote DNS overwrite switch', error),
+      )
+  }, [remote.remoteConfig.dns_overwrite_enabled])
 
   const refreshRemoteConfig = useCallback(async (force = false) => {
     const next = await resolveXboardRemoteConfig({ force })

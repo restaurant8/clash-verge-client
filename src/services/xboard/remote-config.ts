@@ -29,6 +29,7 @@ export const XBOARD_SEED_REMOTE_CONFIG: XboardRemoteConfig = {
   crisp_id: XBOARD_DEFAULT_CRISP_ID,
   imgbb_api_key: '',
   dns_nameserver_policy: '',
+  dns_overwrite_enabled: '',
   discount_delay_seconds: 0,
   delay_display_scale: 0.5,
   version: '1.0.0',
@@ -161,6 +162,12 @@ export const normalizeRemoteConfig = (
     crisp_id: String(merged.crisp_id || XBOARD_SEED_REMOTE_CONFIG.crisp_id),
     imgbb_api_key: String(merged.imgbb_api_key || ''),
     dns_nameserver_policy: String(merged.dns_nameserver_policy || ''),
+    dns_overwrite_enabled:
+      input?.dns_overwrite_enabled === undefined ||
+      input?.dns_overwrite_enabled === null ||
+      input?.dns_overwrite_enabled === ''
+        ? ''
+        : toBoolean(input.dns_overwrite_enabled),
     discount_delay_seconds: toInteger(merged.discount_delay_seconds, 0),
     delay_display_scale: clampNumber(
       toNumber(

@@ -19,6 +19,8 @@ export interface XboardRemoteConfig extends XboardRecord {
   imgbb_api_key: string
   /** 远程下发的 dns.nameserver-policy,优先级高于本地 DNS 设置 */
   dns_nameserver_policy: string
+  /** Optional remote override for the client's DNS overwrite switch. Empty keeps the local choice. */
+  dns_overwrite_enabled: string | boolean
   discount_delay_seconds: number
   delay_display_scale: number
   version: string

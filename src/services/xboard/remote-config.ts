@@ -28,6 +28,7 @@ export const XBOARD_SEED_REMOTE_CONFIG: XboardRemoteConfig = {
   invite_domain: '',
   crisp_id: XBOARD_DEFAULT_CRISP_ID,
   imgbb_api_key: '',
+  dns_nameserver_policy: '',
   discount_delay_seconds: 0,
   delay_display_scale: 0.5,
   version: '1.0.0',
@@ -159,6 +160,7 @@ export const normalizeRemoteConfig = (
     invite_domain: normalizeDomain(String(merged.invite_domain || '')),
     crisp_id: String(merged.crisp_id || XBOARD_SEED_REMOTE_CONFIG.crisp_id),
     imgbb_api_key: String(merged.imgbb_api_key || ''),
+    dns_nameserver_policy: String(merged.dns_nameserver_policy || ''),
     discount_delay_seconds: toInteger(merged.discount_delay_seconds, 0),
     delay_display_scale: clampNumber(
       toNumber(

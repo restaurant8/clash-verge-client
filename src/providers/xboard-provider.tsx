@@ -23,6 +23,7 @@ import {
   XboardApiClient,
   isXboardAuthExpiredError,
 } from '@/services/xboard/api'
+import { pushNameserverPolicy } from '@/services/xboard/dns-policy'
 import {
   getCachedXboardConfig,
   resolveXboardRemoteConfig,
@@ -298,6 +299,11 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     setDelayDisplayScale(remote.remoteConfig.delay_display_scale)
   }, [remote.remoteConfig.delay_display_scale])
+
+  // 远程下发的 DNS 策略:落盘后由内核配置生成流程在所有覆写之后合并。
+  useEffect(() => {
+    void pushNameserverPolicy(remote.remoteConfig.dns_nameserver_policy)
+  }, [remote.remoteConfig.dns_nameserver_policy])
 
   const refreshRemoteConfig = useCallback(async (force = false) => {
     const next = await resolveXboardRemoteConfig({ force })

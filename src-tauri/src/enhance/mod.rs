@@ -639,6 +639,54 @@ async fn apply_dns_settings(mut config: Mapping, enable_dns_settings: bool) -> M
     config
 }
 
+/// 远程下发的 `dns.nameserver-policy`。
+///
+/// 在所有本地设置与手动覆写之后合并,因此优先级高于 DNS 设置页(dns_config.yaml)、
+/// 全局/订阅的 merge 与 script。同名域名以远程值为准,其余条目保留。
+async fn apply_remote_dns_policy(mut config: Mapping) -> Mapping {
+    let Ok(app_dir) = dirs::app_home_dir() else {
+        return config;
+    };
+
+    let policy_path = app_dir.join(constants::files::REMOTE_DNS_POLICY);
+    if !policy_path.exists() {
+        return config;
+    }
+
+    let Ok(policy_yaml) = fs::read_to_string(&policy_path).await else {
+        return config;
+    };
+
+    let remote_policy = match serde_yaml_ng::from_str::<Mapping>(&policy_yaml) {
+        Ok(policy) if !policy.is_empty() => policy,
+        Ok(_) => return config,
+        Err(e) => {
+            logging!(warn, Type::Config, "invalid remote dns policy: {e}");
+            return config;
+        }
+    };
+
+    let entries = remote_policy.len();
+    let dns_key = Value::from("dns");
+    let mut dns = match config.remove(&dns_key) {
+        Some(Value::Mapping(dns)) => dns,
+        _ => Mapping::new(),
+    };
+    let key = Value::from("nameserver-policy");
+    // 同名域名以远程值为准,订阅/本地已有的其它条目保留。
+    let merged = match dns.remove(&key) {
+        Some(Value::Mapping(mut existing)) => {
+            existing.extend(remote_policy);
+            existing
+        }
+        _ => remote_policy,
+    };
+    dns.insert(key, Value::Mapping(merged));
+    config.insert(dns_key, Value::Mapping(dns));
+    logging!(info, Type::Config, "apply remote dns nameserver-policy ({entries} entries)");
+    config
+}
+
 /// Enhance mode
 /// 返回最终订阅、该订阅包含的键、和script执行的结果
 pub async fn enhance() -> Result<(Mapping, HashSet<String>, HashMap<String, ResultLog>)> {
@@ -721,6 +769,9 @@ pub async fn enhance() -> Result<(Mapping, HashSet<String>, HashMap<String, Resu
     // 手动覆盖后恢复 app 权威字段。
     let config = enforce_control_plane(config, control_plane);
     let config = enforce_dns_ipv6(config, dns_ipv6);
+
+    // 远程下发的 DNS 策略排在最后,本地设置与手动覆写都顶不掉。
+    let config = apply_remote_dns_policy(config).await;
 
     let config = cleanup_proxy_groups(config);
     let config = use_sort(config);

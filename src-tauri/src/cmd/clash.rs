@@ -149,6 +149,42 @@ pub async fn save_dns_config(dns_config: Mapping) -> CmdResult {
     Ok(())
 }
 
+/// 保存远程下发的 DNS nameserver-policy
+///
+/// 空 map 表示远程未配置,直接清除本地文件。返回值表示内容是否发生变化,
+/// 未变化时不会重新生成配置(避免每次启动都重启内核)。
+#[tauri::command]
+pub async fn save_remote_dns_policy(policy: Mapping) -> CmdResult<bool> {
+    let policy_path = dirs::app_home_dir()
+        .stringify_err()?
+        .join(constants::files::REMOTE_DNS_POLICY);
+
+    let yaml_str = if policy.is_empty() {
+        Default::default()
+    } else {
+        yaml_emitter::to_mihomo_config_string(&policy).stringify_err()?
+    };
+
+    let current = fs::read_to_string(&policy_path).await.unwrap_or_default();
+    if current.as_str() == yaml_str.as_str() {
+        return Ok(false);
+    }
+
+    if yaml_str.is_empty() {
+        fs::remove_file(&policy_path).await.stringify_err()?;
+        logging!(info, Type::Config, "remote dns policy cleared");
+    } else {
+        fs::write(&policy_path, yaml_str.as_str()).await.stringify_err()?;
+        logging!(info, Type::Config, "remote dns policy saved ({} entries)", policy.len());
+    }
+
+    // 内核未启动时重生成会失败;策略已落盘,下次生成配置时照样生效。
+    logging_error!(Type::Config, CoreManager::global().update_config_checked().await);
+    handle::Handle::refresh_clash();
+
+    Ok(true)
+}
+
 /// 应用或撤销DNS配置
 #[tauri::command]
 pub async fn apply_dns_config(apply: bool) -> CmdResult {

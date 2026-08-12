@@ -172,6 +172,7 @@ mod app_init {
             cmd::copy_clash_env,
             cmd::sync_tray_proxy_selection,
             cmd::save_dns_config,
+            cmd::save_remote_dns_policy,
             cmd::apply_dns_config,
             cmd::check_dns_config_exists,
             cmd::get_dns_config_content,

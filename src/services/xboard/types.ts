@@ -17,6 +17,8 @@ export interface XboardRemoteConfig extends XboardRecord {
   invite_domain: string
   crisp_id: string
   imgbb_api_key: string
+  /** 远程下发的 dns.nameserver-policy,优先级高于本地 DNS 设置 */
+  dns_nameserver_policy: string
   discount_delay_seconds: number
   delay_display_scale: number
   version: string

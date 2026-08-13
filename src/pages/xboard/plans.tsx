@@ -72,6 +72,44 @@ const couponPreviewKey = (planId: string | number, period: string) =>
 const availablePeriods = (plan: any) =>
   PERIODS.filter(([key]) => Number(plan[key] ?? 0) > 0)
 
+const PERIOD_ALIASES: Record<string, (typeof PERIODS)[number][0]> = {
+  '月': 'month_price',
+  '月付': 'month_price',
+  '季': 'quarter_price',
+  '季付': 'quarter_price',
+  '半年': 'half_year_price',
+  '半年付': 'half_year_price',
+  '年': 'year_price',
+  '年付': 'year_price',
+  '2年': 'two_year_price',
+  '两年': 'two_year_price',
+  '3年': 'three_year_price',
+  '三年': 'three_year_price',
+  '一次': 'onetime_price',
+  '一次性': 'onetime_price',
+  '流量包': 'reset_price',
+  '重置': 'reset_price',
+}
+
+const parseDefaultPeriods = (raw: unknown): Record<string, string> => {
+  if (!raw) return {}
+  try {
+    const value = typeof raw === 'string' ? JSON.parse(raw) : raw
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+    return Object.fromEntries(
+      Object.entries(value).flatMap(([planId, period]) => {
+        const text = String(period ?? '').trim()
+        const key = PERIOD_ALIASES[text] || text
+        return PERIODS.some(([candidate]) => candidate === key)
+          ? [[String(planId), key]]
+          : []
+      }),
+    )
+  } catch {
+    return {}
+  }
+}
+
 const asRecord = (value: unknown): XboardRecord =>
   value && typeof value === 'object' ? (value as XboardRecord) : {}
 
@@ -232,6 +270,20 @@ const PlansPage = () => {
   }, [loadPlans])
 
   const plans = useMemo(() => resourceCache.plans ?? [], [resourceCache.plans])
+  const defaultPeriods = useMemo(
+    () => parseDefaultPeriods(remote.remoteConfig.plan_default_periods),
+    [remote.remoteConfig.plan_default_periods],
+  )
+  const selectedPeriod = (plan: any, key: string) => {
+    const periods = availablePeriods(plan)
+    const preferred = defaultPeriods[key]
+    return (
+      periodByPlan[key] ||
+      periods.find(([period]) => period === preferred)?.[0] ||
+      periods[0]?.[0] ||
+      ''
+    )
+  }
   const payments = useMemo(
     () => getUsablePayments(resourceCache.payments ?? []),
     [resourceCache.payments],
@@ -276,7 +328,7 @@ const PlansPage = () => {
       const planId = getId(plan)
       if (planId === undefined || planId === null) continue
       const key = String(planId)
-      const period = periodByPlan[key] || availablePeriods(plan)[0]?.[0]
+      const period = selectedPeriod(plan, key)
       if (period) {
         targets.push({
           planId,
@@ -286,7 +338,7 @@ const PlansPage = () => {
       }
     }
     return targets
-  }, [periodByPlan, plans])
+  }, [defaultPeriods, periodByPlan, plans])
 
   const verifyCoupon = async (
     target: CouponTarget | null,
@@ -462,7 +514,7 @@ const PlansPage = () => {
     const planId = getId(plan)
     const planKey = String(planId)
     const periods = availablePeriods(plan)
-    const period = periodByPlan[planKey] || periods[0]?.[0]
+    const period = selectedPeriod(plan, planKey)
     if (!period) throw new Error('该套餐没有可购买周期')
     const planChangeOrder = isPlanChangeOrder(planId, period)
     let couponForOrder: XboardRecord | undefined
@@ -762,7 +814,7 @@ const PlansPage = () => {
               const planId = getId(plan) ?? index
               const key = String(planId)
               const periods = availablePeriods(plan)
-              const period = periodByPlan[key] || periods[0]?.[0] || ''
+              const period = selectedPeriod(plan, key)
               const price = plan[period]
               const couponPreview = period
                 ? checkedCoupons[couponPreviewKey(planId, period)]

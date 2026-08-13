@@ -30,6 +30,7 @@ export const XBOARD_SEED_REMOTE_CONFIG: XboardRemoteConfig = {
   imgbb_api_key: '',
   dns_nameserver_policy: '',
   dns_overwrite_enabled: '',
+  plan_default_periods: '',
   discount_delay_seconds: 0,
   delay_display_scale: 0.5,
   version: '1.0.0',
@@ -168,6 +169,7 @@ export const normalizeRemoteConfig = (
       input?.dns_overwrite_enabled === ''
         ? ''
         : toBoolean(input.dns_overwrite_enabled),
+    plan_default_periods: String(merged.plan_default_periods || ''),
     discount_delay_seconds: toInteger(merged.discount_delay_seconds, 0),
     delay_display_scale: clampNumber(
       toNumber(

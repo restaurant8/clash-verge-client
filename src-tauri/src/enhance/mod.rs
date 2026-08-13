@@ -125,7 +125,7 @@ async fn get_config_values() -> ConfigValues {
         enable_builtin_enhanced.unwrap_or(true),
         verge_socks_enabled.unwrap_or(false),
         verge_http_enabled.unwrap_or(false),
-        enable_dns_settings.unwrap_or(true),
+        enable_dns_settings.unwrap_or(false),
     );
 
     #[cfg(not(target_os = "windows"))]
@@ -624,6 +624,22 @@ async fn apply_dns_settings(mut config: Mapping, enable_dns_settings: bool) -> M
                 if let Some(dns_mapping) = dns_value.as_mapping() {
                     let mut dns_mapping = dns_mapping.clone();
                     ensure_fake_ip_range6(&mut dns_mapping);
+                    // The UI stores an empty nameserver-policy by default. It
+                    // must not erase domain-specific DNS rules supplied by the
+                    // subscription. Merge policies by domain; local entries
+                    // win here and the remote policy is merged last below.
+                    let policy_key = Value::from("nameserver-policy");
+                    if let Some(Value::Mapping(existing_policy)) = config
+                        .get("dns")
+                        .and_then(Value::as_mapping)
+                        .and_then(|dns| dns.get(&policy_key))
+                    {
+                        let mut merged_policy = existing_policy.clone();
+                        if let Some(Value::Mapping(local_policy)) = dns_mapping.remove(&policy_key) {
+                            merged_policy.extend(local_policy);
+                        }
+                        dns_mapping.insert(policy_key, Value::Mapping(merged_policy));
+                    }
                     config.insert("dns".into(), dns_mapping.into());
                     logging!(info, Type::Core, "apply dns_config.yaml (dns section)");
                 }
@@ -667,11 +683,26 @@ async fn apply_remote_dns_policy(mut config: Mapping) -> Mapping {
     };
 
     let entries = remote_policy.len();
+    config = merge_remote_dns_policy(config, remote_policy);
+    logging!(
+        info,
+        Type::Config,
+        "apply remote dns nameserver-policy ({entries} entries)"
+    );
+    config
+}
+
+fn merge_remote_dns_policy(mut config: Mapping, remote_policy: Mapping) -> Mapping {
     let dns_key = Value::from("dns");
     let mut dns = match config.remove(&dns_key) {
         Some(Value::Mapping(dns)) => dns,
         _ => Mapping::new(),
     };
+    // The remote policy has highest priority, but it is not itself a DNS
+    // overwrite switch. If the subscription disables/omits DNS and the local
+    // or remote-controlled `enable_dns_settings` switch is off, keep DNS off.
+    // To make a policy active without subscription DNS, the control plane must
+    // explicitly also send `dns_overwrite_enabled=true`.
     let key = Value::from("nameserver-policy");
     // 同名域名以远程值为准,订阅/本地已有的其它条目保留。
     let merged = match dns.remove(&key) {
@@ -683,11 +714,6 @@ async fn apply_remote_dns_policy(mut config: Mapping) -> Mapping {
     };
     dns.insert(key, Value::Mapping(merged));
     config.insert(dns_key, Value::Mapping(dns));
-    logging!(
-        info,
-        Type::Config,
-        "apply remote dns nameserver-policy ({entries} entries)"
-    );
     config
 }
 
@@ -789,11 +815,66 @@ pub async fn enhance() -> Result<(Mapping, HashSet<String>, HashMap<String, Resu
 #[allow(clippy::expect_used)]
 #[cfg(test)]
 mod tests {
-    use super::{ChainItem, ChainType, cleanup_proxy_groups, process_global_items, process_profile_items, use_keys};
+    use super::{
+        ChainItem, ChainType, cleanup_proxy_groups, merge_remote_dns_policy, process_global_items,
+        process_profile_items, use_keys,
+    };
     use std::collections::HashMap;
 
     fn mapping(yaml: &str) -> serde_yaml_ng::Mapping {
         serde_yaml_ng::from_str(yaml).expect("test config should be valid")
+    }
+
+    #[test]
+    fn remote_dns_policy_does_not_enable_dns_by_itself() {
+        let config = mapping("{mode: rule}");
+        let remote = mapping("{example.com: https://dns.example/dns-query}");
+
+        let result = merge_remote_dns_policy(config, remote);
+        let dns = result
+            .get("dns")
+            .and_then(serde_yaml_ng::Value::as_mapping)
+            .expect("remote policy should create a DNS policy section");
+
+        assert!(dns.get("enable").is_none());
+        assert!(dns.get("nameserver").is_none());
+        assert!(dns.get("default-nameserver").is_none());
+        assert_eq!(
+            dns.get("nameserver-policy")
+                .and_then(|value| value.get("example.com"))
+                .and_then(serde_yaml_ng::Value::as_str),
+            Some("https://dns.example/dns-query")
+        );
+    }
+
+    #[test]
+    fn remote_dns_policy_wins_without_erasing_subscription_dns() {
+        let config = mapping(
+            r#"{dns: {enable: true, nameserver: [https://doh.pub/dns-query],
+                nameserver-policy: {example.com: https://old.example/dns-query,
+                                    other.example: https://other.example/dns-query}}}"#,
+        );
+        let remote = mapping("{example.com: https://remote.example/dns-query}");
+
+        let result = merge_remote_dns_policy(config, remote);
+        let dns = result
+            .get("dns")
+            .and_then(serde_yaml_ng::Value::as_mapping)
+            .expect("DNS section should remain present");
+
+        assert_eq!(dns.get("enable").and_then(serde_yaml_ng::Value::as_bool), Some(true));
+        assert!(dns.get("nameserver").is_some());
+        assert_eq!(
+            dns.get("nameserver-policy")
+                .and_then(|value| value.get("example.com"))
+                .and_then(serde_yaml_ng::Value::as_str),
+            Some("https://remote.example/dns-query")
+        );
+        assert!(
+            dns.get("nameserver-policy")
+                .and_then(|value| value.get("other.example"))
+                .is_some()
+        );
     }
 
     #[tokio::test]

@@ -21,6 +21,8 @@ export interface XboardRemoteConfig extends XboardRecord {
   dns_nameserver_policy: string
   /** Optional remote override for the client's DNS overwrite switch. Empty keeps the local choice. */
   dns_overwrite_enabled: string | boolean
+  /** JSON map of plan id to preferred billing period, e.g. {"1":"年"}. */
+  plan_default_periods: string
   discount_delay_seconds: number
   delay_display_scale: number
   version: string

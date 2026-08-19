@@ -1,5 +1,5 @@
 {
-  "version": "2.5.6",
+  "version": "2.5.7",
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "bundle": {
     "active": true,
@@ -11,14 +11,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": [
-      "resources"
-    ],
+    "resources": ["resources"],
     "publisher": "MuaCloud",
-    "externalBin": [
-      "sidecar/muacloud-mihomo",
-      "sidecar/muacloud-mihomo-alpha"
-    ],
+    "externalBin": ["sidecar/muacloud-mihomo", "sidecar/muacloud-mihomo-alpha"],
     "copyright": "GNU General Public License v3.0",
     "category": "DeveloperTool",
     "shortDescription": "MuaCloud Native Control Client",
@@ -36,34 +31,24 @@
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY4NjlGNkM4MzU2ODA5MzkKUldRNUNXZzF5UFpwK0FadFQzVWU4OXpiYk93SW4xS1V2SlVLaDBYcEpiU1RxR3pxWWNRZnpMT0oK",
-      "endpoints": [
-        "https://a.4iox.com/update.json"
-      ],
+      "endpoints": ["https://a.4iox.com/update.json"],
       "windows": {
         "installMode": "passive"
       }
     },
     "deep-link": {
       "desktop": {
-        "schemes": [
-          "muacloud",
-          "muacloud-client"
-        ]
+        "schemes": ["muacloud", "muacloud-client"]
       }
     }
   },
   "app": {
     "security": {
-      "capabilities": [
-        "desktop-capability",
-        "migrated"
-      ],
+      "capabilities": ["desktop-capability", "migrated"],
       "assetProtocol": {
         "enable": true,
         "scope": {
-          "allow": [
-            "**"
-          ],
+          "allow": ["**"],
           "requireLiteralLeadingDot": false
         }
       },

@@ -15,7 +15,6 @@ import ProfilesPage from './profiles'
 import ProxiesPage from './proxies'
 import SettingsPage from './settings-entry'
 import AccountPage from './xboard/account'
-import AdvancedSettingsPage from './xboard/advanced-entry'
 import ConnectPage from './xboard/connect'
 import NodesPage from './xboard/nodes'
 import OrdersPage from './xboard/orders'
@@ -90,11 +89,5 @@ export const navItems = [
     path: '/settings',
     icon: [<SettingsRoundedIcon key="mui" />],
     Component: SettingsPage,
-  },
-  {
-    label: '高级',
-    path: '/advanced',
-    icon: [<SettingsRoundedIcon key="mui" />],
-    Component: AdvancedSettingsPage,
   },
 ]

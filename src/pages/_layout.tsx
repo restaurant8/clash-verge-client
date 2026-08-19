@@ -58,8 +58,6 @@ type NavItem = (typeof navItems)[number]
 
 type MenuContextPosition = { top: number; left: number }
 
-// 仅“高级”保留隐藏（5 次点击账户解锁）；“设置”直接显示在导航中。
-const SETTINGS_ENTRY_PATHS = new Set(['/advanced'])
 // 离线模式（未登录 + 本地订阅）下允许访问的页面
 const OFFLINE_NAV_PATHS = new Set([
   '/',
@@ -70,21 +68,13 @@ const OFFLINE_NAV_PATHS = new Set([
 ])
 // 仅离线模式可见的页面：登录后订阅由云端接管，隐藏本地订阅管理入口
 const OFFLINE_ONLY_PATHS = new Set(['/profiles', '/proxies'])
-const SETTINGS_UNLOCK_STORAGE_KEY = 'muacloud:settings-menu-unlocked'
-const SETTINGS_UNLOCK_CLICK_COUNT = 5
-const SETTINGS_UNLOCK_CLICK_WINDOW_MS = 2000
 
 interface SortableNavMenuItemProps {
   item: NavItem
   label: string
-  onActivate?: () => string | void
 }
 
-const SortableNavMenuItem = ({
-  item,
-  label,
-  onActivate,
-}: SortableNavMenuItemProps) => {
+const SortableNavMenuItem = ({ item, label }: SortableNavMenuItemProps) => {
   const {
     attributes,
     listeners,
@@ -109,7 +99,6 @@ const SortableNavMenuItem = ({
     <LayoutItem
       to={item.path}
       icon={item.icon}
-      onActivate={onActivate}
       sortable={{
         setNodeRef,
         attributes,
@@ -153,14 +142,9 @@ const Layout = () => {
   const [menuUnlocked, setMenuUnlocked] = useState(false)
   const [menuContextPosition, setMenuContextPosition] =
     useState<MenuContextPosition | null>(null)
-  const [settingsMenuUnlocked, setSettingsMenuUnlocked] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return window.sessionStorage.getItem(SETTINGS_UNLOCK_STORAGE_KEY) === '1'
-  })
 
   const windowControlsRef = useRef<any>(null)
   const lastWindowModeRef = useRef<'auth' | 'app' | null>(null)
-  const accountMenuClickRef = useRef({ count: 0, lastAt: 0 })
   const { currentWindow } = useWindow()
   const { decorated, refreshDecorated } = useWindowDecorations()
 
@@ -202,9 +186,6 @@ const Layout = () => {
       if (OFFLINE_ONLY_PATHS.has(item.path)) {
         return false
       }
-      if (SETTINGS_ENTRY_PATHS.has(item.path)) {
-        return settingsMenuUnlocked
-      }
       if (item.path === '/tickets') {
         return isFeatureEnabled('enable_ticket_system')
       }
@@ -213,12 +194,7 @@ const Layout = () => {
       }
       return true
     })
-  }, [
-    appConfig?.features,
-    offlineActive,
-    remote.bootstrap?.features,
-    settingsMenuUnlocked,
-  ])
+  }, [appConfig?.features, offlineActive, remote.bootstrap?.features])
 
   const {
     menuOrder,
@@ -266,35 +242,6 @@ const Layout = () => {
     setMenuContextPosition(null)
     void patchVerge({ collapse_navbar: !navCollapsed })
   }, [navCollapsed, patchVerge])
-
-  const handleNavItemActivate = useCallback(
-    (item: NavItem) => {
-      if (settingsMenuUnlocked) return undefined
-
-      if (item.path !== '/account') {
-        accountMenuClickRef.current = { count: 0, lastAt: 0 }
-        return undefined
-      }
-
-      const now = Date.now()
-      const isContinuous =
-        now - accountMenuClickRef.current.lastAt <=
-        SETTINGS_UNLOCK_CLICK_WINDOW_MS
-      const count = isContinuous ? accountMenuClickRef.current.count + 1 : 1
-
-      accountMenuClickRef.current = { count, lastAt: now }
-
-      if (count >= SETTINGS_UNLOCK_CLICK_COUNT) {
-        accountMenuClickRef.current = { count: 0, lastAt: 0 }
-        setSettingsMenuUnlocked(true)
-        window.sessionStorage.setItem(SETTINGS_UNLOCK_STORAGE_KEY, '1')
-        return '/advanced'
-      }
-
-      return undefined
-    },
-    [settingsMenuUnlocked],
-  )
 
   const customTitlebar = useMemo(
     () =>
@@ -382,22 +329,6 @@ const Layout = () => {
       navigate('/', { replace: true })
     }
   }, [booting, navigate, offlineActive, pathname, session])
-
-  useEffect(() => {
-    if (
-      shouldShowAppShell &&
-      !settingsMenuUnlocked &&
-      SETTINGS_ENTRY_PATHS.has(pathname)
-    ) {
-      navigate(offlineActive ? '/' : '/account', { replace: true })
-    }
-  }, [
-    navigate,
-    offlineActive,
-    pathname,
-    settingsMenuUnlocked,
-    shouldShowAppShell,
-  ])
 
   useEffect(() => {
     if (language) {
@@ -542,7 +473,6 @@ const Layout = () => {
                             key={item.path}
                             item={item}
                             label={resolveNavLabel(item.label)}
-                            onActivate={() => handleNavItemActivate(item)}
                           />
                         )
                       })}
@@ -564,7 +494,6 @@ const Layout = () => {
                         key={item.path}
                         to={item.path}
                         icon={item.icon}
-                        onActivate={() => handleNavItemActivate(item)}
                       >
                         {resolveNavLabel(item.label)}
                       </LayoutItem>

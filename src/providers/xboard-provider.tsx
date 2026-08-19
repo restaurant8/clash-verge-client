@@ -6,6 +6,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material'
+import { invoke } from '@tauri-apps/api/core'
 import {
   ReactNode,
   useCallback,
@@ -14,7 +15,6 @@ import {
   useRef,
   useState,
 } from 'react'
-import { invoke } from '@tauri-apps/api/core'
 
 import { patchVergeConfig, stopCore } from '@/services/cmds'
 import { setDelayDisplayScale } from '@/services/delay'
@@ -315,7 +315,10 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
     void patchVergeConfig({ enable_dns_settings: enabled })
       .then(() => invoke('apply_dns_config', { apply: enabled }))
       .catch((error) =>
-        console.warn('[Xboard] failed to apply remote DNS overwrite switch', error),
+        console.warn(
+          '[Xboard] failed to apply remote DNS overwrite switch',
+          error,
+        ),
       )
   }, [remote.remoteConfig.dns_overwrite_enabled])
 
@@ -1064,9 +1067,6 @@ export const XboardProvider = ({ children }: { children: ReactNode }) => {
                 <CircularProgress size={34} />
                 <Typography variant="h6" sx={{ fontWeight: 800 }}>
                   首次启动初始化中
-                </Typography>
-                <Typography color="text.secondary" sx={{ textAlign: 'center' }}>
-                  正在拉取并校验订阅配置，请稍候
                 </Typography>
               </>
             ) : (

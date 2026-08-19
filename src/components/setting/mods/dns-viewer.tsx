@@ -130,7 +130,9 @@ function parseList(str: string): string[] {
 // 默认DNS配置
 const DEFAULT_DNS_CONFIG = {
   enable: true,
-  listen: ':53',
+  // TUN dns-hijack uses Mihomo's internal resolver and does not need a :53
+  // listener. Users who expose a DNS service can still enter one explicitly.
+  listen: '',
   'enhanced-mode': 'fake-ip' as 'fake-ip' | 'redir-host',
   'fake-ip-range': '198.18.0.1/16',
   'fake-ip-range6': 'fdfe:dcba:9876::1/64',

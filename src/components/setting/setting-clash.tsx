@@ -51,7 +51,7 @@ const SettingClash = ({ onError }: Props) => {
     boolean | undefined
   >()
   const dnsSettingsEnabled =
-    dnsSettingsOverride ?? verge?.enable_dns_settings ?? false
+    dnsSettingsOverride ?? verge?.enable_dns_settings ?? true
 
   const webRef = useRef<DialogRef>(null)
   const portRef = useRef<DialogRef>(null)
@@ -97,9 +97,9 @@ const SettingClash = ({ onError }: Props) => {
   useEffect(() => {
     if (!verge) return
     if (verge.enable_dns_settings === undefined) {
-      void patchVerge({ enable_dns_settings: false })
+      void patchVerge({ enable_dns_settings: true })
         .then(() =>
-          invoke('apply_dns_config', { apply: false }).catch(() => undefined),
+          invoke('apply_dns_config', { apply: true }).catch(() => undefined),
         )
         .catch(() => undefined)
     }

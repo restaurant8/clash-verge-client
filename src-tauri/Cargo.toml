@@ -1,6 +1,6 @@
 [package]
 name = "muacloud-client"
-version = "2.5.6"
+version = "2.5.7"
 description = "MuaCloud Native Control Client"
 authors = ["zzzgydi", "Tunglies", "wonfen", "MystiPanda"]
 license = "GPL-3.0-only"

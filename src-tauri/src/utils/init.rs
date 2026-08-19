@@ -122,16 +122,17 @@ pub async fn delete_log() -> Result<()> {
     Ok(())
 }
 
-/// 初始化DNS配置文件
-pub(super) async fn init_dns_config() -> Result<()> {
+/// 软件生成的 DNS 设置模板。
+///
+/// `listen` 故意不提供默认值：TUN 的 `dns-hijack` 直接使用内置解析器，
+/// 无需占用系统 53 端口；需要对外提供 DNS 服务的用户仍可在设置页显式填写。
+pub(crate) fn bundled_dns_mapping() -> serde_yaml_ng::Mapping {
     use serde_yaml_ng::Value;
 
-    // 创建DNS子配置
-    let dns_config = serde_yaml_ng::Mapping::from_iter([
+    serde_yaml_ng::Mapping::from_iter([
         ("enable".into(), Value::Bool(true)),
         // 与前端 DNS 默认一致,并供 dns.ipv6 锁定使用
         ("ipv6".into(), Value::Bool(true)),
-        ("listen".into(), Value::String(":53".into())),
         ("enhanced-mode".into(), Value::String("fake-ip".into())),
         ("fake-ip-range".into(), Value::String("198.18.0.1/16".into())),
         ("fake-ip-range6".into(), Value::String("fdfe:dcba:9876::1/64".into())),
@@ -210,13 +211,21 @@ pub(super) async fn init_dns_config() -> Result<()> {
                 ),
             ])),
         ),
-    ]);
+    ])
+}
 
-    // 获取默认DNS和host配置
-    let default_dns_config = serde_yaml_ng::Mapping::from_iter([
-        ("dns".into(), Value::Mapping(dns_config)),
+pub(crate) fn bundled_dns_config() -> serde_yaml_ng::Mapping {
+    use serde_yaml_ng::Value;
+
+    serde_yaml_ng::Mapping::from_iter([
+        ("dns".into(), Value::Mapping(bundled_dns_mapping())),
         ("hosts".into(), Value::Mapping(serde_yaml_ng::Mapping::new())),
-    ]);
+    ])
+}
+
+/// 初始化DNS配置文件
+pub(super) async fn init_dns_config() -> Result<()> {
+    let default_dns_config = bundled_dns_config();
 
     // 检查DNS配置文件是否存在
     let app_dir = dirs::app_home_dir()?;

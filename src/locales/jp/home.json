@@ -28,6 +28,10 @@
   },
   "components": {
     "proxyTun": {
+      "actions": {
+        "enableProxy": "プロキシを有効化",
+        "enableTunProxy": "TUN プロキシを有効化"
+      },
       "status": {
         "systemProxyEnabled": "システムプロキシが有効になっています。アプリケーションはプロキシを通じてネットワークにアクセスします。",
         "systemProxyDisabled": "システムプロキシが無効になっています。ほとんどのユーザーはこのオプションをオンにすることをお勧めします。",

@@ -28,6 +28,10 @@
   },
   "components": {
     "proxyTun": {
+      "actions": {
+        "enableProxy": "Proxy aktivieren",
+        "enableTunProxy": "TUN-Proxy aktivieren"
+      },
       "status": {
         "systemProxyEnabled": "Der Systemproxy ist aktiviert. Ihre Anwendungen werden über den Proxy auf das Netzwerk zugreifen.",
         "systemProxyDisabled": "Der Systemproxy ist deaktiviert. Es wird empfohlen, diesen Eintrag für die meisten Benutzer zu aktivieren.",

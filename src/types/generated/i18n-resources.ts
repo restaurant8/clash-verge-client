@@ -94,6 +94,10 @@ export interface TranslationResources {
           title: string
         }
         proxyTun: {
+          actions: {
+            enableProxy: string
+            enableTunProxy: string
+          }
           status: {
             systemProxyDisabled: string
             systemProxyEnabled: string

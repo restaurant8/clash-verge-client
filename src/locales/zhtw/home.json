@@ -28,10 +28,14 @@
   },
   "components": {
     "proxyTun": {
+      "actions": {
+        "enableProxy": "開啟代理",
+        "enableTunProxy": "開啟網卡代理"
+      },
       "status": {
         "systemProxyEnabled": "系統代理已啟用，您的應用程式將透過代理存取網路",
-        "systemProxyDisabled": "系統代理已關閉，建議大多數使用者開啟此選項",
-        "tunModeServiceRequired": "虛擬網路介面卡模式需要服務模式，請先安裝服務",
+        "systemProxyDisabled": "如果逾時/無法使用，請使用虛擬網卡模式",
+        "tunModeServiceRequired": "請點擊藍色小扳手安裝服務",
         "tunModeEnabled": "虛擬網路介面卡模式已啟用，應用程式將透過虛擬網路介面卡存取網路",
         "tunModeDisabled": "虛擬網路介面卡模式已關閉，適用於特殊應用程式"
       },

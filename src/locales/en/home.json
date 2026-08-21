@@ -28,6 +28,10 @@
   },
   "components": {
     "proxyTun": {
+      "actions": {
+        "enableProxy": "Enable Proxy",
+        "enableTunProxy": "Enable TUN Proxy"
+      },
       "status": {
         "systemProxyEnabled": "System Proxy Enabled",
         "systemProxyDisabled": "System Proxy Disabled",

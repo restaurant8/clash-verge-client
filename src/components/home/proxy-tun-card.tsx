@@ -236,11 +236,12 @@ export const ProxyTunCard: FC = () => {
       >
         <ProxyControlSwitches
           onError={handleError}
-          label={
+          mode={activeTab === 'system' ? 'system' : 'tun'}
+          label={t(
             activeTab === 'system'
-              ? t('settings.sections.system.toggles.systemProxy')
-              : t('settings.sections.system.toggles.tunMode')
-          }
+              ? 'home.components.proxyTun.actions.enableProxy'
+              : 'home.components.proxyTun.actions.enableTunProxy',
+          )}
           noRightPadding={true}
         />
       </Box>

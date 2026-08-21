@@ -39,6 +39,8 @@ export const translationKeys = [
   'home.page.settings.cards.systemInfo',
   'home.page.settings.title',
   'home.page.title',
+  'home.components.proxyTun.actions.enableProxy',
+  'home.components.proxyTun.actions.enableTunProxy',
   'home.components.proxyTun.status.systemProxyEnabled',
   'home.components.proxyTun.status.systemProxyDisabled',
   'home.components.proxyTun.status.tunModeServiceRequired',

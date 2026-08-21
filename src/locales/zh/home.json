@@ -28,10 +28,14 @@
   },
   "components": {
     "proxyTun": {
+      "actions": {
+        "enableProxy": "开启代理",
+        "enableTunProxy": "开启网卡代理"
+      },
       "status": {
         "systemProxyEnabled": "系统代理已启用，您的应用将通过代理访问网络",
-        "systemProxyDisabled": "系统代理已关闭，建议大多数用户打开此选项",
-        "tunModeServiceRequired": "TUN 模式需要服务模式，请先安装服务",
+        "systemProxyDisabled": "如果超时/无法使用，请使用虚拟网卡模式",
+        "tunModeServiceRequired": "请点击蓝色小扳手安装服务",
         "tunModeEnabled": "TUN 模式已启用，应用将通过虚拟网卡访问网络",
         "tunModeDisabled": "TUN 模式已关闭，适用于特殊应用"
       },

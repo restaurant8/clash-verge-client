@@ -28,6 +28,10 @@
   },
   "components": {
     "proxyTun": {
+      "actions": {
+        "enableProxy": "Activar proxy",
+        "enableTunProxy": "Activar proxy TUN"
+      },
       "status": {
         "systemProxyEnabled": "El proxy del sistema está habilitado. Sus aplicaciones accederán a Internet a través del proxy.",
         "systemProxyDisabled": "El proxy del sistema está deshabilitado. Se recomienda a la mayoría de los usuarios habilitar esta opción.",

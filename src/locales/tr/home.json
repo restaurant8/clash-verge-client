@@ -28,6 +28,10 @@
   },
   "components": {
     "proxyTun": {
+      "actions": {
+        "enableProxy": "Proxy'yi etkinleştir",
+        "enableTunProxy": "TUN proxy'sini etkinleştir"
+      },
       "status": {
         "systemProxyEnabled": "Sistem vekil'i etkinleştirildi, uygulamalarınız vekil üzerinden ağa erişecek",
         "systemProxyDisabled": "Sistem vekil'i devre dışı, çoğu kullanıcı için bu seçeneği açmanız önerilir",
